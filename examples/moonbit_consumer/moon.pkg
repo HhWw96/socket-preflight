@@ -1,0 +1,5 @@
+import {
+  "HhWw96/socket-preflight" @preflight,
+}
+
+pkgtype(kind: "executable")

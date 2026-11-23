@@ -1,0 +1,522 @@
+{
+  "version": "SocketPreflight v0.0.5",
+  "host": "Linux",
+  "node": "v24.13.0",
+  "archive_sha256": "c697cf860ebc6344a0cf340d59490a653eca2079012b2362f2ab5e33a90f8166",
+  "fixture_sha256": "569649484e65ee86229278372acc5bc779d77accf22970a0589a6cdf1242eb50",
+  "linux_manager_cross_check": {
+    "scenarios": 5,
+    "attempts": 30,
+    "report_sha256": "a074c1f2b9b081f67348d4b6a363ae31a4f0dbe21afdc2bf5d42ef54aec01b3b"
+  },
+  "extended_linux_cross_checks": [
+    {
+      "suite": "drop-ins",
+      "scenarios": 1,
+      "attempts": 6,
+      "report_sha256": "e81653f4e558a7ba12d2c30440f9c6da508b1c11dd6dd5a372d33b48fa674d6b"
+    },
+    {
+      "suite": "mapped",
+      "scenarios": 7,
+      "attempts": 39,
+      "report_sha256": "850411b8d2cdb9cb09a1ed4f0a0ab64a82ed62b608c2aa374250faf51957c4fa"
+    }
+  ],
+  "results": [
+    {
+      "case": "shipped-bad-snapshot",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "argument-order-independent",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "shipped-reset-snapshot",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "dual-stack-v4-wildcard",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "ipv6-only-coexists",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "unequal-name-lengths",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "order-is-lexical-not-by-length-or-directory",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "admin-fragment-wins",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "unknown-kernel-default",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unknown_bindv6only"
+      ]
+    },
+    {
+      "case": "kernel-default-dual",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "kernel-default-v6-only",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "ipv6-capability-not-assumed",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "ipv6_support"
+      ]
+    },
+    {
+      "case": "pair-survives-unrelated-unknown",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": [
+        "unsupported_listen_type"
+      ]
+    },
+    {
+      "case": "type-wide-binding-option-applies-to-both",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_binding_option",
+        "unsupported_binding_option"
+      ]
+    },
+    {
+      "case": "prefix-precedence-within-and-across-roots",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "vendor-specific-over-admin-type-wide",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "type-wide-collides-after-global-sort",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "unsupported-generator-type-wide",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_unit_path",
+        "unsupported_unit_path"
+      ]
+    },
+    {
+      "case": "prefix-and-type-wide-precedence",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "mapped-v4-overlap",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "mapped-v4-wildcard",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "mapped-disjoint-v4",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "mapped-ipv6-only-wildcard",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "mapped-dual-stack-wildcard",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "mapped-hex-equivalence",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "mapped-explicit-ipv6-only-fails",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "mapped_ipv4_requires_dual_stack"
+      ]
+    },
+    {
+      "case": "mapped-default-unknown",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unknown_bindv6only"
+      ]
+    },
+    {
+      "case": "mapped-default-is-dual",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "mapped-default-is-ipv6-only",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "mapped_ipv4_requires_dual_stack"
+      ]
+    },
+    {
+      "case": "mapped-ipv6-capability-unknown",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "ipv6_support"
+      ]
+    },
+    {
+      "case": "mapped-wildcard-is-uncovered",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_mapped_ipv4"
+      ]
+    },
+    {
+      "case": "unsupported-generator-fragment",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_unit_path"
+      ]
+    },
+    {
+      "case": "mask-blocks-vendor",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "masked_fragment"
+      ]
+    },
+    {
+      "case": "reuseport-is-inconclusive",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_binding_option"
+      ]
+    },
+    {
+      "case": "empty-socketprotocol-does-not-reset",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_binding_option"
+      ]
+    },
+    {
+      "case": "bad-selected-file-encoding",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "invalid_utf8"
+      ]
+    },
+    {
+      "case": "shadowed-file-content-is-not-read",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "missing-unit",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "missing_fragment"
+      ]
+    },
+    {
+      "case": "duplicate-name-rejected",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "invalid_command"
+      ]
+    },
+    {
+      "case": "path-traversal-rejected",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "invalid_command"
+      ]
+    },
+    {
+      "case": "links-are-not-followed",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "symlink"
+      ]
+    },
+    {
+      "case": "shared-directory-link-is-never-followed",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "symlink",
+        "symlink"
+      ]
+    },
+    {
+      "case": "exact-case-preserved-with-cached-paths",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "human-readable-two-sided-location",
+      "status": "conflict",
+      "exit_code": 1
+    },
+    {
+      "case": "new-conflict-blocks-deployment",
+      "status": "regression",
+      "exit_code": 1,
+      "counts": {
+        "new_conflicts": 1,
+        "existing_conflicts": 0,
+        "resolved_conflicts": 0,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "resolved-conflict-does-not-block",
+      "status": "clear",
+      "exit_code": 0,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 0,
+        "resolved_conflicts": 1,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "carried-conflict-does-not-block",
+      "status": "clear",
+      "exit_code": 0,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 1,
+        "resolved_conflicts": 0,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "one-new-existing-and-resolved",
+      "status": "regression",
+      "exit_code": 1,
+      "counts": {
+        "new_conflicts": 1,
+        "existing_conflicts": 1,
+        "resolved_conflicts": 1,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "provenance-changes-and-duplicates-keep-identity",
+      "status": "clear",
+      "exit_code": 0,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 1,
+        "resolved_conflicts": 0,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "mapped-and-native-ipv4-keep-identity",
+      "status": "clear",
+      "exit_code": 0,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 1,
+        "resolved_conflicts": 0,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "baseline-gap-keeps-addition-uncertain",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 0,
+        "resolved_conflicts": 0,
+        "uncertain_new": 1,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "candidate-gap-keeps-removal-uncertain",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 0,
+        "resolved_conflicts": 0,
+        "uncertain_new": 0,
+        "uncertain_resolved": 1
+      }
+    },
+    {
+      "case": "unrelated-gap-preserves-proven-regression",
+      "status": "regression",
+      "exit_code": 1,
+      "counts": {
+        "new_conflicts": 1,
+        "existing_conflicts": 1,
+        "resolved_conflicts": 1,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "truncated-reports-cannot-prove-no-regression",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 256,
+        "resolved_conflicts": 0,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "invalid-candidate-root",
+      "status": "input_error",
+      "exit_code": 3,
+      "counts": {
+        "new_conflicts": 0,
+        "existing_conflicts": 0,
+        "resolved_conflicts": 0,
+        "uncertain_new": 0,
+        "uncertain_resolved": 0
+      }
+    },
+    {
+      "case": "compare-requires-two-roots",
+      "status": "input_error",
+      "exit_code": 3
+    },
+    {
+      "case": "human-readable-regression-details",
+      "status": "regression",
+      "exit_code": 1
+    }
+  ],
+  "totals": {
+    "pass": 57
+  }
+}

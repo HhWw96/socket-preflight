@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "environment": {"ipv6": "enabled", "bindv6only": "unknown"},
+  "baseline": {"root": "before", "units": ["legacy.socket"]},
+  "transition": {"root": "overlap", "units": ["legacy.socket", "next.socket"]},
+  "candidate": {"root": "after", "units": ["next.socket"]}
+}

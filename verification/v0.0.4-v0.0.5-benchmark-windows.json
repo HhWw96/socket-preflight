@@ -1,0 +1,269 @@
+{
+  "host": "Windows-11-10.0.22000-SP0",
+  "node": "v24.13.0",
+  "baseline": {
+    "file": "socket-preflight-v0.0.4.cjs",
+    "sha256": "78db3e739f600bc27ae391db23874c8d74bdd9399d1770245273f023fefe9e2c",
+    "version": "SocketPreflight v0.0.4"
+  },
+  "candidate": {
+    "file": "socket-preflight-v0.0.5.cjs",
+    "sha256": "159e53a7b82a95a716269c5ea052bfe1828f7cf450bee9f4b262028f89b51878",
+    "version": "SocketPreflight v0.0.5"
+  },
+  "runs_per_version_per_case": 9,
+  "warmups_per_version_per_case": 2,
+  "measurement": "Warm-cache CLI wall time including Node startup and JSON output capture. FS call counts from separate runs.",
+  "workloads": {
+    "shipped_pair": {
+      "exit_code": 1,
+      "expected_conflicts": 1,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 126.537,
+        "min_ms": 123.356,
+        "max_ms": 134.385,
+        "samples_ms": [
+          129.898,
+          125.469,
+          123.356,
+          123.839,
+          134.385,
+          126.537,
+          129.774,
+          125.19,
+          127.083
+        ],
+        "fs_calls": {
+          "lstatSync": 247,
+          "realpathNative": 91,
+          "opendirSync": 2,
+          "openSync": 3
+        }
+      },
+      "candidate": {
+        "median_ms": 98.515,
+        "min_ms": 95.471,
+        "max_ms": 102.109,
+        "samples_ms": [
+          98.515,
+          98.372,
+          96.677,
+          98.938,
+          99.336,
+          95.728,
+          100.16,
+          95.471,
+          102.109
+        ],
+        "fs_calls": {
+          "lstatSync": 41,
+          "realpathNative": 26,
+          "opendirSync": 2,
+          "openSync": 3
+        }
+      },
+      "median_change_percent": -22.1
+    },
+    "inherited_drop_ins_64_units": {
+      "exit_code": 0,
+      "expected_conflicts": 0,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 4210.669,
+        "min_ms": 4125.819,
+        "max_ms": 4401.264,
+        "samples_ms": [
+          4401.264,
+          4400.648,
+          4252.756,
+          4276.644,
+          4192.866,
+          4210.669,
+          4185.591,
+          4125.819,
+          4150.151
+        ],
+        "fs_calls": {
+          "lstatSync": 18497,
+          "realpathNative": 10240,
+          "opendirSync": 256,
+          "openSync": 256
+        }
+      },
+      "candidate": {
+        "median_ms": 707.039,
+        "min_ms": 674.877,
+        "max_ms": 803.83,
+        "samples_ms": [
+          803.83,
+          772.923,
+          705.862,
+          691.092,
+          708.249,
+          717.655,
+          698.056,
+          707.039,
+          674.877
+        ],
+        "fs_calls": {
+          "lstatSync": 1950,
+          "realpathNative": 1358,
+          "opendirSync": 4,
+          "openSync": 256
+        }
+      },
+      "median_change_percent": -83.2
+    },
+    "sparse_same_port_512_listeners": {
+      "exit_code": 0,
+      "expected_conflicts": 0,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 1633.108,
+        "min_ms": 1599.852,
+        "max_ms": 1673.67,
+        "samples_ms": [
+          1653.044,
+          1673.67,
+          1656.281,
+          1633.108,
+          1607.748,
+          1638.707,
+          1621.111,
+          1617.77,
+          1599.852
+        ],
+        "fs_calls": {
+          "lstatSync": 10305,
+          "realpathNative": 1984,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "candidate": {
+        "median_ms": 296.947,
+        "min_ms": 288.76,
+        "max_ms": 301.466,
+        "samples_ms": [
+          294.511,
+          288.76,
+          301.466,
+          290.834,
+          298.324,
+          299.784,
+          300.912,
+          296.774,
+          296.947
+        ],
+        "fs_calls": {
+          "lstatSync": 524,
+          "realpathNative": 388,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "median_change_percent": -81.8
+    },
+    "dense_same_port_512_listeners": {
+      "exit_code": 1,
+      "expected_conflicts": 129024,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 1658.946,
+        "min_ms": 1617.56,
+        "max_ms": 1760.796,
+        "samples_ms": [
+          1620.738,
+          1662.12,
+          1670.667,
+          1760.796,
+          1617.56,
+          1658.946,
+          1666.867,
+          1658.464,
+          1630.961
+        ],
+        "fs_calls": {
+          "lstatSync": 10305,
+          "realpathNative": 1984,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "candidate": {
+        "median_ms": 307.868,
+        "min_ms": 303.888,
+        "max_ms": 328.764,
+        "samples_ms": [
+          307.868,
+          306.113,
+          328.764,
+          310.952,
+          308.003,
+          304.904,
+          304.768,
+          309.561,
+          303.888
+        ],
+        "fs_calls": {
+          "lstatSync": 524,
+          "realpathNative": 388,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "median_change_percent": -81.4
+    },
+    "compare_two_64_unit_snapshots": {
+      "exit_code": 1,
+      "expected_conflicts": 1,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 7956.303,
+        "min_ms": 7879.987,
+        "max_ms": 8138.839,
+        "samples_ms": [
+          7946.516,
+          7911.14,
+          8110.633,
+          8138.839,
+          8094.217,
+          7956.303,
+          7940.984,
+          7985.384,
+          7879.987
+        ],
+        "fs_calls": {
+          "lstatSync": 37000,
+          "realpathNative": 20486,
+          "opendirSync": 513,
+          "openSync": 513
+        }
+      },
+      "candidate": {
+        "median_ms": 1234.746,
+        "min_ms": 1210.527,
+        "max_ms": 1265.758,
+        "samples_ms": [
+          1210.527,
+          1234.746,
+          1231.065,
+          1227.554,
+          1265.758,
+          1253.909,
+          1243.276,
+          1236.082,
+          1234.041
+        ],
+        "fs_calls": {
+          "lstatSync": 3906,
+          "realpathNative": 2722,
+          "opendirSync": 9,
+          "openSync": 513
+        }
+      },
+      "median_change_percent": -84.5
+    }
+  }
+}

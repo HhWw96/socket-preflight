@@ -1,0 +1,223 @@
+{
+  "version": "SocketPreflight v0.0.1",
+  "host": "Windows",
+  "node": "v24.13.0",
+  "archive_sha256": "4f957b5277cfb7567f13cd0e5a1b5d73294dfa0bae0d1b85625244a74f8782be",
+  "fixture_sha256": "569649484e65ee86229278372acc5bc779d77accf22970a0589a6cdf1242eb50",
+  "linux_manager_cross_check": {
+    "scenarios": 5,
+    "attempts": 30,
+    "report_sha256": "a074c1f2b9b081f67348d4b6a363ae31a4f0dbe21afdc2bf5d42ef54aec01b3b"
+  },
+  "results": [
+    {
+      "case": "shipped-bad-snapshot",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "argument-order-independent",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "shipped-reset-snapshot",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "dual-stack-v4-wildcard",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "ipv6-only-coexists",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "unequal-name-lengths",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "order-is-lexical-not-by-length-or-directory",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "admin-fragment-wins",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "unknown-kernel-default",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unknown_bindv6only"
+      ]
+    },
+    {
+      "case": "kernel-default-dual",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": []
+    },
+    {
+      "case": "kernel-default-v6-only",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "ipv6-capability-not-assumed",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "ipv6_support"
+      ]
+    },
+    {
+      "case": "pair-survives-unrelated-unknown",
+      "status": "conflict",
+      "exit_code": 1,
+      "conflict_count": 1,
+      "issues": [
+        "unsupported_listen_type"
+      ]
+    },
+    {
+      "case": "unsupported-type-wide-drop-in",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_inheritance",
+        "unsupported_inheritance"
+      ]
+    },
+    {
+      "case": "unsupported-dash-prefix-drop-in",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_inheritance"
+      ]
+    },
+    {
+      "case": "unsupported-generator-fragment",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_unit_path"
+      ]
+    },
+    {
+      "case": "mask-blocks-vendor",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "masked_fragment"
+      ]
+    },
+    {
+      "case": "reuseport-is-inconclusive",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_binding_option"
+      ]
+    },
+    {
+      "case": "empty-socketprotocol-does-not-reset",
+      "status": "inconclusive",
+      "exit_code": 2,
+      "conflict_count": 0,
+      "issues": [
+        "unsupported_binding_option"
+      ]
+    },
+    {
+      "case": "bad-selected-file-encoding",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "invalid_utf8"
+      ]
+    },
+    {
+      "case": "shadowed-file-content-is-not-read",
+      "status": "clear",
+      "exit_code": 0,
+      "conflict_count": 0,
+      "issues": []
+    },
+    {
+      "case": "missing-unit",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "missing_fragment"
+      ]
+    },
+    {
+      "case": "duplicate-name-rejected",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "invalid_command"
+      ]
+    },
+    {
+      "case": "path-traversal-rejected",
+      "status": "input_error",
+      "exit_code": 3,
+      "conflict_count": 0,
+      "issues": [
+        "invalid_command"
+      ]
+    },
+    {
+      "case": "links-are-not-followed",
+      "status": "skipped",
+      "reason": "OSError"
+    },
+    {
+      "case": "human-readable-two-sided-location",
+      "status": "conflict",
+      "exit_code": 1
+    }
+  ],
+  "totals": {
+    "pass": 25,
+    "skip": 1
+  }
+}

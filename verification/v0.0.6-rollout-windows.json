@@ -1,0 +1,54 @@
+{
+  "version": "SocketPreflight v0.0.6",
+  "archive_sha256": "835765da89dc65e3fc84ec89f394fb333b74e7c25330accc3a95a83ea32b66c0",
+  "host": "Windows-11-10.0.22000-SP0",
+  "node": "v24.13.0",
+  "checks": {
+    "overlap_scan": {
+      "exit_code": 1,
+      "endpoints": {
+        "legacy.socket": [
+          "[::]:45391"
+        ],
+        "next.socket": [
+          "127.0.0.1:45391"
+        ]
+      }
+    },
+    "fixed_scan": {
+      "exit_code": 0,
+      "endpoints": {
+        "legacy.socket": [
+          "[::]:45391"
+        ],
+        "next.socket": [
+          "127.0.0.1:45392"
+        ]
+      }
+    }
+  },
+  "systemd": {
+    "sha256": "5d67727b2c49bdfef3cff80e35e1aceff6bc2dc85d5de177a46bc131832a69d8",
+    "stages": 4,
+    "trials": 18,
+    "environment": {
+      "kernel": "6.18.58.1-microsoft-standard-WSL2",
+      "os": {
+        "NAME": "Ubuntu",
+        "ID": "ubuntu",
+        "PRETTY_NAME": "Ubuntu 24.04.5 LTS",
+        "VERSION_ID": "24.04",
+        "VERSION": "24.04.5 LTS (Noble Numbat)",
+        "VERSION_CODENAME": "noble",
+        "ID_LIKE": "debian",
+        "HOME_URL": "https://www.ubuntu.com/",
+        "SUPPORT_URL": "https://help.ubuntu.com/",
+        "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+        "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+        "UBUNTU_CODENAME": "noble",
+        "LOGO": "ubuntu-logo"
+      },
+      "systemd": "systemd 255 (255.4-1ubuntu8.19)"
+    }
+  }
+}

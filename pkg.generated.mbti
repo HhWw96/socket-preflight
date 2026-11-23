@@ -1,0 +1,208 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "HhWw96/socket-preflight"
+
+import {
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn analyze(Array[UnitInput], Environment) -> Report
+
+pub fn analyze_rollout(RolloutInput) -> RolloutReport
+
+pub fn command_error(String) -> Report
+
+pub fn compare_reports(Report, Report) -> Comparison
+
+pub fn comparison_error(String) -> Comparison
+
+pub fn file_source(String) -> Source
+
+pub fn inherited_drop_in_dirs(String) -> Array[String]
+
+pub fn input_issue(String, String, Source?) -> Issue
+
+pub let max_units : Int32
+
+pub fn rollout_error(String) -> RolloutReport
+
+pub fn select_files(Array[Layer]) -> FilePlan
+
+pub fn supported_drop_in_name(String) -> Bool
+
+pub fn supported_unit_name(String) -> Bool
+
+pub fn uncovered(String, String, Source?) -> Issue
+
+pub let version : String
+
+// Errors
+
+// Types and methods
+#derive(@json.ToJson)
+pub(all) struct Comparison {
+  schema_version : Int32
+  version : String
+  status : String
+  exit_code : Int32
+  complete : Bool
+  baseline : Report?
+  candidate : Report?
+  issues : Array[Issue]
+  new_conflicts : Array[Conflict]
+  existing_conflicts : Array[Conflict]
+  resolved_conflicts : Array[Conflict]
+  uncertain_new : Array[Conflict]
+  uncertain_resolved : Array[Conflict]
+}
+pub fn Comparison::to_json(Self) -> @json.Json
+
+#derive(@json.ToJson)
+pub(all) struct Conflict {
+  code : String
+  port : Int32
+  first : Listener
+  second : Listener
+}
+pub fn Conflict::to_json(Self) -> @json.Json
+
+pub(all) struct DropIn {
+  basename : String
+  path : String
+}
+
+#derive(@json.ToJson)
+pub(all) struct Environment {
+  ipv6 : String
+  bindv6only : String
+}
+pub fn Environment::to_json(Self) -> @json.Json
+
+#derive(@json.ToJson)
+pub(all) struct FilePlan {
+  fragment : String?
+  drop_ins : Array[String]
+  shadowed : Array[Shadow]
+}
+pub fn FilePlan::to_json(Self) -> @json.Json
+
+pub(all) struct FileText {
+  path : String
+  text : String
+}
+
+#derive(@json.ToJson)
+pub(all) struct Issue {
+  severity : String
+  code : String
+  message : String
+  source : Source?
+}
+pub fn Issue::to_json(Self) -> @json.Json
+
+pub(all) struct Layer {
+  fragment : String?
+  drop_ins : Array[DropIn]
+}
+
+#derive(@json.ToJson)
+pub(all) struct ListenReset {
+  key : String
+  source : Source
+  cleared : Array[ListenSetting]
+}
+pub fn ListenReset::to_json(Self) -> @json.Json
+
+#derive(@json.ToJson)
+pub(all) struct ListenSetting {
+  key : String
+  value : String
+  source : Source
+}
+pub fn ListenSetting::to_json(Self) -> @json.Json
+
+#derive(@json.ToJson)
+pub(all) struct Listener {
+  unit : String
+  endpoint : String
+  address : String
+  port : Int32
+  family : String
+  mapped_ipv4 : String?
+  setting : ListenSetting
+  ipv6_mode : String?
+  ipv6_mode_source : Source?
+}
+pub fn Listener::to_json(Self) -> @json.Json
+
+#derive(@json.ToJson)
+pub(all) struct Report {
+  schema_version : Int32
+  version : String
+  status : String
+  exit_code : Int32
+  environment : Environment?
+  units : Array[UnitReport]
+  conflicts : Array[Conflict]
+  conflict_count : Int32
+  conflicts_omitted : Int32
+  issues : Array[Issue]
+}
+pub fn Report::to_json(Self) -> @json.Json
+
+pub(all) struct RolloutInput {
+  baseline : Array[UnitInput]
+  transition : Array[UnitInput]?
+  candidate : Array[UnitInput]
+  environment : Environment
+}
+
+#derive(@json.ToJson)
+pub(all) struct RolloutReport {
+  schema_version : Int32
+  version : String
+  status : String
+  exit_code : Int32
+  complete : Bool
+  transition : Comparison?
+  candidate : Comparison?
+  issues : Array[Issue]
+}
+pub fn RolloutReport::to_json(Self) -> @json.Json
+
+#derive(@json.ToJson)
+pub(all) struct Shadow {
+  path : String
+  winner : String
+}
+pub fn Shadow::to_json(Self) -> @json.Json
+
+#derive(@json.ToJson)
+pub(all) struct Source {
+  path : String
+  line : Int32?
+  end_line : Int32?
+}
+pub fn Source::to_json(Self) -> @json.Json
+
+pub(all) struct UnitInput {
+  name : String
+  plan : FilePlan
+  files : Array[FileText]
+  discovery_issues : Array[Issue]
+}
+
+#derive(@json.ToJson)
+pub(all) struct UnitReport {
+  name : String
+  plan : FilePlan
+  active_listen : Array[ListenSetting]
+  resets : Array[ListenReset]
+  comparable_listeners : Array[Listener]
+  issues : Array[Issue]
+}
+pub fn UnitReport::to_json(Self) -> @json.Json
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,23 @@
+Archive SHA-256 2a598d987f4cb791a9d34ec7d235ab45035f44dec6616a5240b235217794bf53
+
+v24.13.0
+node socket-preflight-v0.0.9.cjs rollout --plan examples/rollout/bad.json
+ROLLOUT REGRESSION
+[transition]
+REGRESSION | 1 new, 0 existing, 0 resolved
+New
+TCP 45391: IPv6 wildcard in dual-stack mode also occupies the IPv4 port
+  legacy.socket [::]:45391 from usr/lib/systemd/system/legacy.socket:3
+    IPv6 mode both (usr/lib/systemd/system/legacy.socket:2)
+  next.socket 127.0.0.1:45391 from usr/lib/systemd/system/next.socket:2
+[candidate]
+CLEAR | 0 new, 0 existing, 0 resolved
+Exit 1 in 0.206 s
+
+node socket-preflight-v0.0.9.cjs rollout --plan examples/rollout/fixed.json
+ROLLOUT CLEAR
+[transition]
+CLEAR | 0 new, 0 existing, 0 resolved
+[candidate]
+CLEAR | 0 new, 0 existing, 0 resolved
+Exit 0 in 0.151 s
