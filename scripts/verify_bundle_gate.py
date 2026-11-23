@@ -126,6 +126,23 @@ def verify(release, inputs):
             rejected = variant("checkpoint-root-stays-inside-bundle", updated_plan=multistage)
             assert rejected["rollout"] is None
 
+        if int(entry.rsplit(".", 2)[-2]) >= 24:
+            units = ["v4.socket", "v6.socket"]
+            stage = {"root": "target", "units": units}
+            scope = {"schema_version": 2, "checkpoints": [],
+                     "environment": {"ipv6": "enabled", "bindv6only": "1"},
+                     "baseline": stage, "policy": "require-clear",
+                     "candidate": {**stage, "environment": {"ipv6": "enabled", "bindv6only": "0"}}}
+            snapshots = [
+                ("target/usr/lib/systemd/system/v4.socket", b"[Socket]\nListenStream=127.0.0.1:45397\n"),
+                ("target/usr/lib/systemd/system/v6.socket", b"[Socket]\nListenStream=[::]:45397\n"),
+            ]
+            missing = variant("stage-rebind-unverified-blocks", snapshots, scope, expected=2)
+            assert missing["rollout"]["issues"][0]["code"] == "unverified_rebind"
+            scope["candidate"]["rebind_all"] = True
+            conflict = variant("stage-rebind-confirmed-detects-conflict", snapshots, scope, expected=1)
+            assert conflict["rollout"]["candidate"]["new_conflicts"][0]["port"] == 45397
+
         variant("unmodelled_environment", updated_plan={
             **plan, "environment": {"ipv6": "enabled", "bindv6only": "unknown"}}, expected=2)
         variant("escape_member", [("../escaped", b"test")])

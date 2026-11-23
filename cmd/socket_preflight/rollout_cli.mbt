@@ -16,10 +16,10 @@ fn load_plan_stage(
   label : String,
   json : Json?,
   budget : Budget,
-  named~ : Bool = false,
+  expected_fields~ : Int = 2,
 ) -> Result[Array[@preflight.UnitInput], String] {
   guard json is Some(Object(fields)) &&
-    fields.length() == (if named { 3 } else { 2 }) &&
+    fields.length() == expected_fields &&
     fields.get("root") is Some(String(root)) &&
     !root.is_empty() &&
     fields.get("units") is Some(Array(names)) &&
@@ -49,7 +49,53 @@ fn load_plan_stage(
 ///|
 priv enum LoadedRollout {
   Legacy(@preflight.RolloutInput)
-  Named(@preflight.CheckpointRolloutInput, Bool)
+  Staged(@preflight.StageInput, Array[@preflight.StagedCheckpoint], @preflight.StageInput, Bool)
+}
+
+///|
+fn plan_environment(value : Json?) -> @preflight.Environment? {
+  guard value is Some(Object(env)) &&
+    env.length() == 2 &&
+    env.get("ipv6") is Some(String(ipv6)) &&
+    (ipv6 == "enabled" || ipv6 == "disabled" || ipv6 == "unknown") &&
+    env.get("bindv6only") is Some(String(bindv6only)) &&
+    (bindv6only == "0" || bindv6only == "1" || bindv6only == "unknown") else {
+    return None
+  }
+  Some({ ipv6, bindv6only, })
+}
+
+///|
+fn load_staged_plan(
+  directory : String,
+  label : String,
+  json : Json?,
+  fallback : @preflight.Environment,
+  budget : Budget,
+  named~ : Bool = false,
+) -> Result[@preflight.StageInput, String] {
+  guard json is Some(Object(fields)) else { return Err("\{label} must be an object.") }
+  let mut expected_fields = if named { 3 } else { 2 }
+  let environment = match fields.get("environment") {
+    None => fallback
+    value => {
+      expected_fields += 1
+      guard plan_environment(value) is Some(environment) else {
+        return Err("\{label} environment needs valid ipv6 and bindv6only values.")
+      }
+      environment
+    }
+  }
+  let rebind_all = match fields.get("rebind_all") {
+    None => false
+    Some(True) => { expected_fields += 1; true }
+    Some(False) => { expected_fields += 1; false }
+    _ => return Err("\{label} rebind_all must be a boolean.")
+  }
+  match load_plan_stage(directory, label, json, budget, expected_fields~) {
+    Ok(units) => Ok({ units, environment, rebind_all, })
+    Err(message) => Err(message)
+  }
 }
 
 ///|
@@ -73,10 +119,7 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
   let policy = fields.get("policy")
   let named_fields = if policy is Some(_) { 6 } else { 5 }
   guard fields.get("schema_version") is Some(Number(schema, ..)) &&
-    fields.get("environment") is Some(Object(environment)) &&
-    environment.length() == 2 &&
-    environment.get("ipv6") is Some(String(ipv6)) &&
-    environment.get("bindv6only") is Some(String(bindv6only)) else {
+    plan_environment(fields.get("environment")) is Some(environment) else {
     return Err(
       "Supply schema_version, environment, baseline and candidate.",
     )
@@ -96,25 +139,19 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
     Some(String("require-clear")) => true
     _ => return Err("Policy must be new-conflicts or require-clear.")
   }
-  let environment : @preflight.Environment = { ipv6, bindv6only, }
   let limit = 4 * 1024 * 1024
   let budget : Budget = { remaining: limit, }
-  let baseline = match
-    load_plan_stage(directory, "baseline", fields.get("baseline"), budget) {
-    Ok(stage) => stage
-    Err(message) => return Err(message)
-  }
-  if checkpoints is None {
-    budget.remaining = limit
-  }
-  let candidate = match
-    load_plan_stage(directory, "candidate", fields.get("candidate"), budget) {
-    Ok(stage) => stage
-    Err(message) => return Err(message)
-  }
   if checkpoints is Some(checkpoints) {
+    let baseline = match load_staged_plan(directory, "baseline", fields.get("baseline"), environment, budget) {
+      Ok(stage) => stage
+      Err(message) => return Err(message)
+    }
+    let candidate = match load_staged_plan(directory, "candidate", fields.get("candidate"), environment, budget) {
+      Ok(stage) => stage
+      Err(message) => return Err(message)
+    }
     let names : Map[String, Bool] = Map([])
-    let stages : Array[@preflight.Checkpoint] = []
+    let stages : Array[@preflight.StagedCheckpoint] = []
     for stage in checkpoints {
       guard stage is Object(fields) &&
         fields.get("name") is Some(String(name)) &&
@@ -123,12 +160,23 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
         return Err("Use distinct literal checkpoint names.")
       }
       names[name] = true
-      match load_plan_stage(directory, name, Some(stage), budget, named=true) {
-        Ok(units) => stages.push({ name, units, })
+      match load_staged_plan(directory, name, Some(stage), environment, budget, named=true) {
+        Ok(stage) => stages.push({ name, stage, })
         Err(message) => return Err(message)
       }
     }
-    return Ok(Named({ baseline, candidate, checkpoints: stages, environment, }, require_clear))
+    return Ok(Staged(baseline, stages, candidate, require_clear))
+  }
+  let baseline = match
+    load_plan_stage(directory, "baseline", fields.get("baseline"), budget) {
+    Ok(stage) => stage
+    Err(message) => return Err(message)
+  }
+  budget.remaining = limit
+  let candidate = match
+    load_plan_stage(directory, "candidate", fields.get("candidate"), budget) {
+    Ok(stage) => stage
+    Err(message) => return Err(message)
   }
   budget.remaining = limit
   let transition = match transition {
@@ -192,12 +240,8 @@ fn run_rollout(args : ArrayView[String]) -> Unit {
   }
   let report = match input {
     Ok(Legacy(plan)) => @preflight.analyze_rollout(plan)
-    Ok(Named(plan, require_clear)) => {
-      let result = if require_clear {
-        @preflight.analyze_strict_checkpoint_rollout(plan)
-      } else {
-        @preflight.analyze_checkpoint_rollout(plan)
-      }
+    Ok(Staged(baseline, stages, candidate, require_clear)) => {
+      let result = @preflight.analyze_staged_rollout(baseline, stages, candidate, require_clear~)
       emit_checkpoint_rollout(result, json)
       return
     }

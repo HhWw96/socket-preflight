@@ -16,6 +16,19 @@ pub(all) struct CheckpointRolloutInput {
 }
 
 ///|
+pub(all) struct StageInput {
+  units : Array[UnitInput]
+  environment : Environment
+  rebind_all : Bool
+}
+
+///|
+pub(all) struct StagedCheckpoint {
+  name : String
+  stage : StageInput
+}
+
+///|
 #derive(@json.ToJson)
 pub(all) struct CheckpointResult {
   name : String
@@ -84,26 +97,72 @@ fn analyze_checkpoints(
   input : CheckpointRolloutInput,
   require_clear : Bool,
 ) -> CheckpointRolloutReport {
-  if !valid_environment(input.environment) {
-    return checkpoint_rollout_error("Invalid target IPv6 environment.")
+  let stage = fn(units : Array[UnitInput]) -> StageInput {
+    { units, environment: input.environment, rebind_all: false, }
   }
-  if input.checkpoints.length() > max_checkpoints {
+  let checkpoints = input.checkpoints.map(checkpoint => {
+    StagedCheckpoint::{ name: checkpoint.name, stage: stage(checkpoint.units), }
+  })
+  analyze_staged_rollout(stage(input.baseline), checkpoints, stage(input.candidate), require_clear~)
+}
+
+///|
+/// Compare against the baseline, guarding environment changes between adjacent
+/// stages when a unit may keep sockets created under the old environment.
+pub fn analyze_staged_rollout(
+  baseline : StageInput,
+  checkpoints : Array[StagedCheckpoint],
+  candidate : StageInput,
+  require_clear~ : Bool = false,
+) -> CheckpointRolloutReport {
+  if checkpoints.length() > max_checkpoints {
     return checkpoint_rollout_error("Choose at most \{max_checkpoints} checkpoints.")
   }
   let names : Map[String, Bool] = Map([])
-  for checkpoint in input.checkpoints {
+  for checkpoint in checkpoints {
     if !supported_checkpoint_name(checkpoint.name) || names.contains(checkpoint.name) {
       return checkpoint_rollout_error("Use distinct literal checkpoint names.")
     }
     names[checkpoint.name] = true
   }
-  let before = analyze_group(input.baseline, input.environment)
-  let candidate = compare_groups(before, analyze_group(input.candidate, input.environment), true)
-  let checkpoints = input.checkpoints.map(checkpoint => {
+  let stages = checkpoints.copy()
+  stages.push({ name: "candidate", stage: candidate, })
+  if !valid_environment(baseline.environment) ||
+    stages.any(checkpoint => !valid_environment(checkpoint.stage.environment)) {
+    return checkpoint_rollout_error("Invalid target IPv6 environment.")
+  }
+  let mut previous = baseline
+  let issues = []
+  for checkpoint in stages {
+    let current = checkpoint.stage
+    let previous_env = previous.environment
+    let env = current.environment
+    if (previous_env.ipv6 != env.ipv6 || previous_env.bindv6only != env.bindv6only) &&
+      !current.rebind_all &&
+      current.units.any(unit => previous.units.any(old => old.name == unit.name)) {
+      issues.push(uncovered(
+        "unverified_rebind",
+        "\{checkpoint.name}: target environment changed with shared units. Confirm all listeners are recreated with rebind_all.",
+        None,
+      ))
+    }
+    previous = current
+  }
+  if !issues.is_empty() {
+    return {
+      schema_version: 2, version, status: "inconclusive", exit_code: 2,
+      complete: false, checkpoints: [], candidate: None, issues,
+    }
+  }
+  let before = analyze_group(baseline.units, baseline.environment)
+  let candidate = compare_groups(before, analyze_group(candidate.units, candidate.environment),
+                                 true, allow_environment_changes=true)
+  let checkpoints = checkpoints.map(checkpoint => {
     let comparison = compare_groups(
       before,
-      analyze_group(checkpoint.units, input.environment),
+      analyze_group(checkpoint.stage.units, checkpoint.stage.environment),
       true,
+      allow_environment_changes=true,
     )
     { name: checkpoint.name, result: { ..comparison, baseline: None, }, }
   })

@@ -151,6 +151,41 @@ def check_plans(node, entry, example, checks):
             plan.write_text(json.dumps(policy_plan), encoding="utf-8")
             gate("strict-policy-spelling-is-validated", plan, 3)
 
+    if int(entry.stem.rsplit(".", 1)[-1]) >= 24:
+        stage_dir = example / "target-env/usr/lib/systemd/system"
+        stage_dir.mkdir(parents=True)
+        for name, endpoint in (("v6.socket", "[::]:45397"), ("v4.socket", "127.0.0.1:45397")):
+            (stage_dir / name).write_text(f"[Socket]\nListenStream={endpoint}\n", encoding="utf-8")
+        a = {"ipv6": "enabled", "bindv6only": "1"}
+        b = {"ipv6": "enabled", "bindv6only": "0"}
+        shared = {"root": "target-env", "units": ["v4.socket", "v6.socket"]}
+
+        def target(label, code, before, after, schema=2, status=None, **attrs):
+            plan.write_text(json.dumps({"schema_version": 2, "environment": before, "baseline": shared,
+                "checkpoints": [], "candidate": {**shared, "environment": after, **attrs}}), encoding="utf-8")
+            return gate(label, plan, code, schema=schema, status=status)
+
+        check = target("environment-change-needs-rebind", 2, a, b)
+        assert check["issues"][0]["code"] == "unverified_rebind"
+        check = target("confirmed-rebind-creates-overlap", 1, a, b, rebind_all=True)
+        assert check["candidate"]["new_conflicts"][0]["port"] == 45397
+        assert check["candidate"]["candidate"]["environment"] == b
+        check = target("confirmed-rebind-resolves-overlap", 0, b, a, rebind_all=True)
+        assert check["candidate"]["resolved_conflicts"][0]["port"] == 45397
+        target("stage-rebind-must-be-boolean", 3, a, b, schema=1, rebind_all="true")
+        target("stage-environment-must-be-complete", 3, a, {"ipv6": "enabled"}, schema=1)
+        plan.write_text(json.dumps({"schema_version": 2, "environment": a, "baseline": shared,
+            "checkpoints": [{**shared, "name":"flip", "environment":b, "rebind_all":True}],
+            "candidate": shared}), encoding="utf-8")
+        check = gate("return-to-default-needs-rebind-too", plan, 2, schema=2)
+        assert "candidate" in check["issues"][0]["message"]
+        plan.write_text(json.dumps({"schema_version": 2, "environment": a, "baseline": shared,
+            "policy": "require-clear",
+            "checkpoints": [{**shared, "name":"flip", "environment":b, "rebind_all":True}],
+            "candidate": {**shared, "rebind_all": True}}), encoding="utf-8")
+        check = gate("strict-stage-environment-change-is-blocked", plan, 1, schema=2, status="conflict")
+        assert check["checkpoints"][0]["result"]["new_conflicts"]
+
 
 def verify(archive, receipt):
     node = shutil.which("node")

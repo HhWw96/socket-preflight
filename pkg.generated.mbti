@@ -12,6 +12,8 @@ pub fn analyze_checkpoint_rollout(CheckpointRolloutInput) -> CheckpointRolloutRe
 
 pub fn analyze_rollout(RolloutInput) -> RolloutReport
 
+pub fn analyze_staged_rollout(StageInput, Array[StagedCheckpoint], StageInput, require_clear? : Bool) -> CheckpointRolloutReport
+
 pub fn analyze_strict_checkpoint_rollout(CheckpointRolloutInput) -> CheckpointRolloutReport
 
 pub fn command_error(String) -> Report
@@ -226,6 +228,17 @@ pub(all) struct Source {
   end_line : Int32?
 }
 pub fn Source::to_json(Self) -> @json.Json
+
+pub(all) struct StageInput {
+  units : Array[UnitInput]
+  environment : Environment
+  rebind_all : Bool
+}
+
+pub(all) struct StagedCheckpoint {
+  name : String
+  stage : StageInput
+}
 
 pub(all) struct UnitInput {
   name : String

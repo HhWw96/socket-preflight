@@ -57,7 +57,22 @@ def single_trial(namespace, name, expected, count, ports):
     return {"exit": start.returncode, "stderr": start.stderr, "journal": logs, "listeners": listeners, "pass": passed}
 
 
-def run_controlled(cli, root, label, files, endpoints, bindv6only, expected, locations):
+def retained_listener_check(namespace, names, ports):
+    # The old socket retains its IPv6-only setting after the default changes.
+    ipv6, ipv4 = names["ipv6.socket"], names["ipv4.socket"]
+    run("systemctl", "start", ipv6)
+    run("nsenter", "--net=" + namespace, "sysctl", "-w", "net.ipv6.bindv6only=0")
+    run("systemctl", "start", ipv4)
+    retained = listeners_in(namespace, ports)
+    assert len(retained) == 2
+    run("systemctl", "stop", ipv4, ipv6)
+    rebound = try_order(namespace, [ipv6, ipv4], False, {ipv6: 1, ipv4: 1},
+        conflict_probe=lambda _: probe_bind(namespace, "127.0.0.1:45393", "both"), ports=ports)
+    assert rebound["pass"], rebound
+    return {"old_listeners_retained": retained, "both_recreated": rebound}
+
+
+def run_controlled(cli, root, label, files, endpoints, bindv6only, expected, locations, retained=False):
     for path, value in files.items():
         target = root / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -99,10 +114,12 @@ def run_controlled(cli, root, label, files, endpoints, bindv6only, expected, loc
                         conflict_probe=lambda unit: probe_bind(ns, endpoints[reverse_names[unit]][0],
                             "both" if bindv6only == "0" else "ipv6-only"),
                         ports=ports))
+        supplemental = retained_listener_check(ns, names, ports) if retained else None
         return {"scenario": label, "scan": scan, "manager": manager, "verify_exit": verify.returncode,
                 "verify_stderr": verify.stderr, "list_sockets_before": listed.stdout,
                 "file_sha256": {path: sha(value.encode()) for path, value in files.items()},
-                "attempts": attempts, "pass": verify.returncode == 0 and all(row["pass"] for row in attempts)}
+                "attempts": attempts, "retained_listener_check": supplemental,
+                "pass": verify.returncode == 0 and all(row["pass"] for row in attempts)}
     finally:
         lab.cleanup()
 
@@ -128,6 +145,7 @@ def verify_release(release, digest, out):
         binary = release.with_suffix(".cjs").name
         cli = work / binary
         cli.write_bytes(package.read(binary))
+        staged_environments = int(release.stem.rsplit(".", 1)[-1]) >= 24
         rows = []
         for case, stage, folder, endpoints in STAGES:
             if stage != "transition":
@@ -160,8 +178,25 @@ def verify_release(release, digest, out):
             endpoints = {"ipv4.socket": ["127.0.0.1:45393"], "ipv6.socket": ["[::]:45393"]}
             files = {VENDOR + name: f"[Socket]\nListenStream={values[0]}\n" for name, values in endpoints.items()}
             rows.append(run_controlled(cli, work / label, label, files, endpoints, mode,
-                                      int(mode == "0"), {(name, 2) for name in endpoints}))
+                                      int(mode == "0"), {(name, 2) for name in endpoints},
+                                      retained=staged_environments and mode == "1"))
             emit(rows[-1])
+        if staged_environments:
+            a = {"ipv6": "enabled", "bindv6only": "1"}
+            b = {"ipv6": "enabled", "bindv6only": "0"}
+            stage = {"root": "target-ipv6-only-1", "units": ["ipv4.socket", "ipv6.socket"]}
+            plan_file = work / "plan.json"
+            for label, before, after, rebind, expected in (
+                ("unverified_rebind", a, b, False, 2), ("new_regression", a, b, True, 1),
+                ("resolved_conflict", b, a, True, 0),
+            ):
+                plan = {"schema_version": 2, "environment": before, "baseline": stage, "checkpoints": [],
+                        "candidate": {**stage, "environment": after, "rebind_all": rebind}}
+                plan_file.write_text(json.dumps(plan), encoding="utf-8")
+                proc = run("node", cli, "rollout", "--json", "--plan", plan_file, check=False)
+                report = json.loads(proc.stdout)
+                assert proc.returncode == report["exit_code"] == expected, report
+                emit({"stage_environment_check": label, "report": report})
     count = sum(len(row["attempts"]) for row in rows)
     passed = count == 30 and all(row["pass"] for row in rows)
     emit({"scenarios": len(rows), "attempts": count, "pass": passed})
