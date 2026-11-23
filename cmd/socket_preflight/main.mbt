@@ -20,9 +20,9 @@ priv enum Snapshots {
 let usage : String =
   #| SocketPreflight
   #|   socket-preflight scan --root <snapshot-dir> [--ipv6 enabled|disabled|unknown]
-  #|       [--bindv6only 0|1|unknown] [--json] <first.socket> <second.socket> [...]
+  #|       [--bindv6only 0|1|unknown] [--json] <first.socket> [...]
   #|   socket-preflight compare --baseline <snapshot-dir> --candidate <snapshot-dir>
-  #|       [same environment flags] [--json] <first.socket> <second.socket> [...]
+  #|       [same environment flags] [--json] <first.socket> [...]
   #|   socket-preflight rollout --plan <plan.json> [--json]
   #|   socket-preflight --version
   #| 
@@ -82,8 +82,8 @@ fn parse_options(args : ArrayView[String]) -> Result[Options, String] {
     _ =>
       return Err("Supply --root with an exported snapshot directory for scan.")
   }
-  if units.length() < 2 || units.length() > @preflight.max_units {
-    return Err("Supply 2–\{@preflight.max_units} distinct .socket units.")
+  if units.is_empty() || units.length() > @preflight.max_units {
+    return Err("Supply 1–\{@preflight.max_units} distinct .socket units.")
   }
   units.sort()
   let ipv6 = options.get("--ipv6").unwrap_or("unknown")
@@ -137,7 +137,12 @@ fn show_conflict(conflict : @preflight.Conflict) -> Unit {
     "wildcard_overlap" => "wildcard covers the other address in the same family"
     _ => "same canonical address"
   }
-  println("TCP \{conflict.port}: \{reason}")
+  let scope = if conflict.first.unit == conflict.second.unit {
+    " (within \{conflict.first.unit})"
+  } else {
+    ""
+  }
+  println("TCP \{conflict.port}\{scope}: \{reason}")
   show_listener(conflict.first)
   show_listener(conflict.second)
 }

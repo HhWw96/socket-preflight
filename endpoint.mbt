@@ -274,7 +274,7 @@ fn is_dual_wildcard(listener : Listener) -> Bool {
 
 ///|
 fn conflict_kind(a : Listener, b : Listener) -> String? {
-  if a.unit == b.unit || a.port != b.port {
+  if a.port != b.port {
     return None
   }
   if a.family == b.family && a.address == b.address {

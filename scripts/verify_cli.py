@@ -334,11 +334,29 @@ def main():
             assert (result["new_conflicts"][0]["port"], result["existing_conflicts"][0]["port"],
                     result["resolved_conflicts"][0]["port"]) == (45393, 45391, 45392)
 
-            shifted = snapshot("line-shift-duplicate", first="# inserted comment\n" + PAYLOAD + PAYLOAD)
-            result = compare("provenance-changes-and-duplicates-keep-identity",
+            shifted = snapshot("line-shift", first="# inserted comment\n" + PAYLOAD)
+            result = compare("provenance-changes-keep-binding-identity",
                              snapshot("plain-comparison"), shifted, 0, counts=(0, 1, 0, 0, 0))
-            assert result["candidate"]["conflict_count"] == 2
+            assert result["candidate"]["conflict_count"] == 1
             assert result["existing_conflicts"][0]["first"]["setting"]["source"]["line"] == 3
+
+            if patch >= 14:
+                wildcard = "ListenStream=0.0.0.0:45391\n"
+                ordered = snapshot("intra-unit-wildcard", first=PAYLOAD + wildcard)
+                reversed_order = snapshot("intra-unit-reordered",
+                                          first="[Socket]\n" + wildcard + PAYLOAD.split("\n", 1)[1])
+                single = ("admin.socket",)
+                intra = scan("intra-unit-wildcard-conflict", ordered, 1, units=single, conflicts=1)
+                finding = intra["conflicts"][0]
+                assert finding["code"] == "wildcard_overlap"
+                assert [(finding[k]["unit"], finding[k]["setting"]["source"]["line"])
+                        for k in ("first", "second")] == [("admin.socket", 2), ("admin.socket", 3)]
+                compare("intra-unit-order-does-not-change-identity", ordered, reversed_order, 0,
+                        units=single, counts=(0, 1, 0, 0, 0))
+                compare("intra-unit-regression-blocks", shifted, ordered, 1,
+                        units=single, counts=(1, 0, 0, 0, 0))
+                compare("intra-unit-reset-resolves", ordered, shifted, 0,
+                        units=single, counts=(0, 0, 1, 0, 0))
 
             mapped = snapshot("mapped-representation", first=listener("[::ffff:127.0.0.1]", "both"))
             compare("mapped-and-native-ipv4-keep-identity", shifted, mapped, 0, counts=(0, 1, 0, 0, 0))

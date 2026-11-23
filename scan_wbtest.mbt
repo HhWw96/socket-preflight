@@ -39,6 +39,26 @@ fn compare_config(
 }
 
 ///|
+test "same-unit overlap reports both effective sources" {
+  let unit = test_unit("a.socket", [
+    "[Socket]\nListenStream=0.0.0.0:45391",
+    "[Socket]\nListenStream=127.0.0.1:45391",
+  ])
+  let env = Environment::{ ipv6: "disabled", bindv6only: "unknown" }
+  let result = analyze([unit], env)
+  inspect(result.exit_code, content="1")
+  inspect(result.conflict_count, content="1")
+  let conflict = result.conflicts[0]
+  assert_eq(conflict.first.unit, conflict.second.unit)
+  assert_eq(conflict.first.setting.source.path, "vendor/a.socket")
+  assert_eq(conflict.second.setting.source.path, "local/a.socket.d/1.conf")
+  let reset = test_unit("a.socket", [
+    unit.files[0].text, "[Socket]\nListenStream=\nListenStream=127.0.0.1:45391",
+  ])
+  assert_eq(analyze([reset], env).exit_code, 0)
+}
+
+///|
 test "basename precedence is applied before alphabetical ordering" {
   let selected = select_files([
     {

@@ -50,7 +50,7 @@ fn listener_identity(listener : Listener) -> String {
 fn conflict_identity(conflict : Conflict) -> String {
   let first = listener_identity(conflict.first)
   let second = listener_identity(conflict.second)
-  if compare_ascii_paths(conflict.first.unit, conflict.second.unit) < 0 {
+  if compare_ascii_paths(first, second) < 0 {
     first + "|" + second
   } else {
     second + "|" + first

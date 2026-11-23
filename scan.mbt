@@ -283,9 +283,9 @@ pub fn analyze(inputs : Array[UnitInput], env : Environment) -> Report {
       "Expected ipv6=enabled|disabled|unknown and bindv6only=0|1|unknown.",
     )
   }
-  if inputs.length() < 2 || inputs.length() > max_units {
+  if inputs.is_empty() || inputs.length() > max_units {
     return command_error(
-      "Choose 2–\{max_units} distinct socket units in the same namespace.",
+      "Choose 1–\{max_units} distinct socket units in the same namespace.",
     )
   }
   analyze_group(inputs, env)
