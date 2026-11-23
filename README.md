@@ -1,10 +1,9 @@
-# SocketPreflight v0.0.5 历史发行清单
+# SocketPreflight v0.0.6 历史发行清单
 
 本版为历史二进制归档，附当时生成的 CLI 和发行 ZIP。这个标签对应发行清单。
 
-[下载历史发行包](https://github.com/HhWw96/socket-preflight/releases/tag/v0.0.5)
+[下载历史发行包](https://github.com/HhWw96/socket-preflight/releases/tag/v0.0.6)
 
 历史独立源码以项目已冻结的源码版本为准。
 
-- 在单份快照内复用目录探测和共享 drop-in 列表。读取生效文件前重新检查类型与路径大小写，两个比较快照各自独立。
-- 加入可复跑的端到端基准，逐项核对两版输出，并统计耗时和文件系统调用。
+- 加入依据 systemd #14044 重建的部署样本、修正版和隔离 Linux 复跑脚本。
