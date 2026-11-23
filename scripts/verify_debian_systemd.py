@@ -82,6 +82,7 @@ def verify_stage(bundle, stage_name, folder, endpoints, coexist):
                                               "-p", "ExecStartPost,ExecStopPost", "--value").stdout.strip():
             raise ValueError("The original Cockpit hooks are still active")
         verify = run("systemd-analyze", "verify", "--man=no", *names.values(), check=False)
+        listed = run("systemctl", "list-sockets", "--no-legend", "--no-pager", *names.values())
         for unit, props in manager.items():
             actual = [line.removesuffix(" (Stream)") for line in props["Listen"]]
             if (actual != [endpoints[unit]] or props["NetworkNamespacePath"] != namespace
@@ -108,6 +109,7 @@ def verify_stage(bundle, stage_name, folder, endpoints, coexist):
                 "bindv6only": default, "file_sha256": {path: sha(content) for path, content in files.items()},
                 "effective": endpoints, "manager": manager, "lab_overrides": control,
                 "lab_stub": STUB, "verify_exit": verify.returncode, "verify_stderr": verify.stderr,
+                "list_sockets_before": listed.stdout,
                 "attempts": attempts, "pass": verify.returncode == 0 and all(item["pass"] for item in attempts)}
     finally:
         sandbox.cleanup()
