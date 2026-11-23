@@ -17,7 +17,7 @@
 
 工作流结构和从冻结发行包挑选输入的代码已经本地验证。GitHub 托管运行及非作者复跑待回执。[本地工作流检查](debian/v0.0.13-workflow-local.json) · [工作流](../.github/workflows/debian-deployment.yml) · [复跑演示](../DEMO.md)
 
-与 v0.0.9 的五组旧场景基准在两个平台的业务输出均一致，每组每版交替采样五次。[Windows 基准](debian/v0.0.9-v0.0.13-benchmark-windows.json) · [Debian 基准](debian/v0.0.9-v0.0.13-benchmark-linux.json) · [冻结清单](debian/v0.0.13-freeze.json) · [源码快照](debian/v0.0.13-source.zip)
+与 v0.0.9 的五组旧场景基准在两个平台的业务输出均一致，每组每版交替采样五次。[Windows 基准](debian/v0.0.9-v0.0.13-benchmark-windows.json) · [Debian 基准](debian/v0.0.9-v0.0.13-benchmark-linux.json) · [冻结清单](debian/v0.0.13-freeze.json) · [源码快照](https://github.com/HhWw96/socket-preflight/releases/download/v0.0.13/socket-preflight-v0.0.13-frozen-source.zip)
 
 ## v0.0.6 至 v0.0.9 · 部署切换
 
@@ -37,7 +37,7 @@
 | v0.0.6 | [共存坏例和修正版分别退出 1、0](v0.0.6-rollout-windows.json) |
 | v0.0.7 | [15 项切换检查](v0.0.7-rollout-windows.json) |
 | v0.0.8 | [Windows](v0.0.8-release-windows.json) · [Ubuntu](v0.0.8-release-linux.json) |
-| v0.0.9 | [Windows](v0.0.9-release-windows.json) · [Ubuntu](v0.0.9-release-linux.json) · [演示执行记录](v0.0.9-demo.txt) · [冻结清单](v0.0.9-freeze.json) · [源码快照](v0.0.9-source.zip) |
+| v0.0.9 | [Windows](v0.0.9-release-windows.json) · [Ubuntu](v0.0.9-release-linux.json) · [演示执行记录](v0.0.9-demo.txt) · [冻结清单](v0.0.9-freeze.json) · [源码快照](https://github.com/HhWw96/socket-preflight/releases/download/v0.0.9/socket-preflight-v0.0.9-frozen-source.zip) |
 
 跨平台检查由项目在本地和临时 Ubuntu 上完成。第三方复跑状态待回执。[三分钟演示及复跑方法](../DEMO.md)
 

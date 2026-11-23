@@ -4,6 +4,16 @@ SocketPreflight 在部署前检查一组拟同时启动的 systemd `.socket` 单
 
 [三分钟演示](DEMO.md) 展示如何找到只会在部署切换窗口出现的冲突。
 
+## 发布与安装
+
+GitHub 保留 v0.0.1 至 v0.0.13 的独立发行包。v0.0.9 和 v0.0.13 对应冻结源码，并已发布到 Mooncakes。其余版本为历史二进制归档。[GitHub Releases](https://github.com/HhWw96/socket-preflight/releases) · [Mooncakes](https://mooncakes.io/docs/HhWw96/socket-preflight@0.0.13/)
+
+在 MoonBit 项目中安装当前版本。
+
+```text
+moon add HhWw96/socket-preflight@0.0.13
+```
+
 ## 运行
 
 解压发行包，在解压目录用 Node.js 24 运行。示例中的 `public.socket` 监听 `[::]:45391`，并允许 IPv4 共用 IPv6 监听。`admin.socket` 的配置覆盖另外加入了 `127.0.0.1:45391`。
