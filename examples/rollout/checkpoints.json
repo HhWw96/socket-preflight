@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "environment": {"ipv6": "enabled", "bindv6only": "unknown"},
+  "baseline": {"root": "before", "units": ["legacy.socket"]},
+  "checkpoints": [
+    {"name": "canary", "root": "overlap", "units": ["legacy.socket"]},
+    {"name": "coexist", "root": "overlap", "units": ["legacy.socket", "next.socket"]}
+  ],
+  "candidate": {"root": "after", "units": ["next.socket"]}
+}

@@ -39,6 +39,20 @@ pub fn rollout_error(message : String) -> RolloutReport {
 }
 
 ///|
+fn rollout_outcome(results : Array[Comparison]) -> (String, Int, Bool) {
+  let complete = results.all(result => result.complete)
+  if results.any(result => result.exit_code == 3) {
+    ("input_error", 3, false)
+  } else if results.any(result => result.exit_code == 1) {
+    ("regression", 1, complete)
+  } else if !complete {
+    ("inconclusive", 2, false)
+  } else {
+    ("clear", 0, true)
+  }
+}
+
+///|
 /// Compare the declared transition and candidate groups independently against
 /// the baseline. This function consumes selected files and performs no I/O.
 pub fn analyze_rollout(input : RolloutInput) -> RolloutReport {
@@ -57,19 +71,11 @@ pub fn analyze_rollout(input : RolloutInput) -> RolloutReport {
   let overlap = transition.map(stage => {
     compare_groups(before, analyze_group(stage, environment), true)
   })
-  let overlap_code = overlap.map_or(0, result => result.exit_code)
-  let complete = candidate_result.complete &&
-    overlap.map_or(true, result => result.complete)
-  let (status, exit_code) = if candidate_result.exit_code == 3 ||
-    overlap_code == 3 {
-    ("input_error", 3)
-  } else if candidate_result.exit_code == 1 || overlap_code == 1 {
-    ("regression", 1)
-  } else if !complete {
-    ("inconclusive", 2)
-  } else {
-    ("clear", 0)
+  let results = [candidate_result]
+  if overlap is Some(result) {
+    results.push(result)
   }
+  let (status, exit_code, complete) = rollout_outcome(results)
   {
     schema_version: 1,
     version,

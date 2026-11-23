@@ -102,10 +102,19 @@ def validate_plan_roots(content, paths):
     plan = json.loads(content.decode("utf-8"))
     if not isinstance(plan, dict):
         raise ValueError("plan.json must contain an object")
-    for name in ("baseline", "transition", "candidate"):
-        if name == "transition" and name not in plan:
-            continue
-        stage = plan.get(name)
+    schema = plan.get("schema_version")
+    stages = [(name, plan.get(name)) for name in ("baseline", "candidate")]
+    if schema == 2:
+        checkpoints = plan.get("checkpoints")
+        if not isinstance(checkpoints, list) or len(checkpoints) > 8 or "transition" in plan:
+            raise ValueError("Schema 2 requires up to eight checkpoints")
+        stages.extend((f"checkpoint {index}", stage) for index, stage in enumerate(checkpoints, 1))
+    elif schema == 1:
+        if "transition" in plan:
+            stages.append(("transition", plan["transition"]))
+    else:
+        raise ValueError("Unsupported rollout plan schema")
+    for name, stage in stages:
         root = stage.get("root") if isinstance(stage, dict) else None
         if not isinstance(root, str):
             raise ValueError(f"{name} requires a ZIP-relative root")

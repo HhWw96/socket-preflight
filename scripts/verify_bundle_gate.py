@@ -108,6 +108,16 @@ def verify(release, inputs):
                         archive.writestr(entry, content)
             return run(name, target, expected)
 
+        if int(entry.rsplit(".", 2)[-2]) >= 17:
+            multistage = {key: value for key, value in plan.items() if key != "transition"}
+            multistage["schema_version"] = 2
+            multistage["checkpoints"] = [{"name": "during", **plan["transition"]}]
+            result = variant("named-checkpoint-deployment-bundle", updated_plan=multistage, expected=1)
+            assert result["rollout"]["checkpoints"][0]["result"]["new_conflicts"][0]["port"] == 9090
+            multistage["checkpoints"][0]["root"] = "../outside"
+            rejected = variant("checkpoint-root-stays-inside-bundle", updated_plan=multistage)
+            assert rejected["rollout"] is None
+
         variant("unmodelled_environment", updated_plan={
             **plan, "environment": {"ipv6": "enabled", "bindv6only": "unknown"}}, expected=2)
         variant("escape_member", [("../escaped", b"test")])

@@ -241,13 +241,13 @@ fn scan_snapshot(
 fn load_snapshot(
   root : String,
   units : Array[String],
+  budget~ : Budget = { remaining: 4 * 1024 * 1024, },
 ) -> Result[Array[@preflight.UnitInput], String] {
   let snapshot = open_probe(root)
   let root_type = probe(snapshot, "", "kind")[0]
   if root_type != "directory" {
     return Err("Snapshot root must be a readable directory (\{root_type}).")
   }
-  let budget : Budget = { remaining: 4 * 1024 * 1024, }
   Ok(units.map(name => load_unit(snapshot, name, budget)))
 }
 

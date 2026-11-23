@@ -8,6 +8,8 @@ import {
 // Values
 pub fn analyze(Array[UnitInput], Environment) -> Report
 
+pub fn analyze_checkpoint_rollout(CheckpointRolloutInput) -> CheckpointRolloutReport
+
 pub fn analyze_rollout(RolloutInput) -> RolloutReport
 
 pub fn command_error(String) -> Report
@@ -22,11 +24,15 @@ pub fn inherited_drop_in_dirs(String) -> Array[String]
 
 pub fn input_issue(String, String, Source?) -> Issue
 
+pub let max_checkpoints : Int32
+
 pub let max_units : Int32
 
 pub fn rollout_error(String) -> RolloutReport
 
 pub fn select_files(Array[Layer]) -> FilePlan
+
+pub fn supported_checkpoint_name(String) -> Bool
 
 pub fn supported_drop_in_name(String) -> Bool
 
@@ -39,6 +45,38 @@ pub let version : String
 // Errors
 
 // Types and methods
+pub(all) struct Checkpoint {
+  name : String
+  units : Array[UnitInput]
+}
+
+#derive(@json.ToJson)
+pub(all) struct CheckpointResult {
+  name : String
+  result : Comparison
+}
+pub fn CheckpointResult::to_json(Self) -> @json.Json
+
+pub(all) struct CheckpointRolloutInput {
+  baseline : Array[UnitInput]
+  checkpoints : Array[Checkpoint]
+  candidate : Array[UnitInput]
+  environment : Environment
+}
+
+#derive(@json.ToJson)
+pub(all) struct CheckpointRolloutReport {
+  schema_version : Int32
+  version : String
+  status : String
+  exit_code : Int32
+  complete : Bool
+  checkpoints : Array[CheckpointResult]
+  candidate : Comparison?
+  issues : Array[Issue]
+}
+pub fn CheckpointRolloutReport::to_json(Self) -> @json.Json
+
 #derive(@json.ToJson)
 pub(all) struct Comparison {
   schema_version : Int32

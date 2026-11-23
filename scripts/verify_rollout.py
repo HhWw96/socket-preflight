@@ -49,9 +49,9 @@ def run_cli(node, entry, *args, code):
 
 
 def check_plans(node, entry, example, checks):
-    def gate(label, plan, code):
+    def gate(label, plan, code, schema=1):
         report = run_cli(node, entry, "rollout", "--plan", str(plan), "--json", code=code)
-        assert report["schema_version"] == 1
+        assert report["schema_version"] == schema
         assert report["status"] == {0: "clear", 1: "regression", 2: "inconclusive", 3: "input_error"}[code]
         checks[label] = {"exit_code": code, "complete": report["complete"]}
         return report
@@ -112,6 +112,26 @@ def check_plans(node, entry, example, checks):
     scope = {"root": "dense", "units": names}
     incomplete = variant("truncation_is_inconclusive", 2, baseline=scope, transition=scope, candidate=scope)
     assert incomplete["candidate"]["candidate"]["conflicts_omitted"] == 20
+
+    checkpoints = example / "checkpoints.json"
+    if checkpoints.is_file():
+        result = gate("named-checkpoint-blocks-clear-candidate", checkpoints, 1, schema=2)
+        assert result["schema_version"] == 2
+        assert [(stage["name"], stage["result"]["exit_code"]) for stage in result["checkpoints"]] == [
+            ("canary", 0), ("coexist", 1)]
+        assert result["candidate"]["exit_code"] == 0
+        assert result["checkpoints"][1]["result"]["new_conflicts"][0]["port"] == 45391
+        staged_plan = json.loads(checkpoints.read_text(encoding="utf-8"))
+        stages = staged_plan["checkpoints"]
+        stages[1]["root"] = "fixed"
+        plan.write_text(json.dumps(staged_plan), encoding="utf-8")
+        gate("fixed-checkpoints-pass", plan, 0, schema=2)
+        stages[1]["name"] = stages[0]["name"]
+        plan.write_text(json.dumps(staged_plan), encoding="utf-8")
+        gate("duplicate-checkpoint-name", plan, 3)
+        stages[1]["name"] = "candidate"
+        plan.write_text(json.dumps(staged_plan), encoding="utf-8")
+        gate("reserved-checkpoint-name", plan, 3)
 
 
 def verify(archive, receipt):
