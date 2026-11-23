@@ -7,7 +7,7 @@ priv struct Options {
   snapshots : Snapshots
   units : Array[String]
   environment : @preflight.Environment
-  json : Bool
+  output : String
 }
 
 ///|
@@ -21,9 +21,9 @@ let usage : String =
   #| SocketPreflight
   #|   socket-preflight inventory --root <snapshot-dir> [--json]
   #|   socket-preflight scan --root <snapshot-dir> [--ipv6 enabled|disabled|unknown]
-  #|       [--bindv6only 0|1|unknown] [--json] <first.socket> [...]
+  #|       [--bindv6only 0|1|unknown] [--json|--sarif] <first.socket> [...]
   #|   socket-preflight compare --baseline <snapshot-dir> --candidate <snapshot-dir>
-  #|       [same environment flags] [--json] <first.socket> [...]
+  #|       [same environment flags] [--json|--sarif] <first.socket> [...]
   #|   socket-preflight rollout --plan <plan.json> [--json]
   #|   socket-preflight --version
   #| 
@@ -41,13 +41,13 @@ fn parse_options(args : ArrayView[String]) -> Result[Options, String] {
   let options : Map[String, String] = Map([])
   let units : Array[String] = []
   let selected : Map[String, Bool] = Map([])
-  let mut json = false
+  let mut output = "text"
   let mut at = 1
   while at < args.length() {
     let text = args[at]
     at += 1
     match text {
-      "--json" if !json => json = true
+      "--json" | "--sarif" if output == "text" => output = text
       "--root" | "--baseline" | "--candidate" | "--ipv6" | "--bindv6only" => {
         if at == args.length() ||
           args[at].is_empty() ||
@@ -95,7 +95,7 @@ fn parse_options(args : ArrayView[String]) -> Result[Options, String] {
   if bindv6only != "0" && bindv6only != "1" && bindv6only != "unknown" {
     return Err("--bindv6only accepts 0, 1, or unknown.")
   }
-  Ok({ snapshots, units, environment: { ipv6, bindv6only, }, json, })
+  Ok({ snapshots, units, environment: { ipv6, bindv6only, }, output, })
 }
 
 ///|
@@ -280,24 +280,36 @@ fn main {
   match parse_options(args) {
     Err(message) => {
       let json = args.any(arg => arg == "--json")
-      if args[0] == "compare" {
+      if args.any(arg => arg == "--sarif") {
+        emit_scan_sarif(@preflight.command_error(message), ".")
+      } else if args[0] == "compare" {
         emit_comparison(@preflight.comparison_error(message), json)
       } else {
         emit(@preflight.command_error(message), json)
       }
     }
     Ok(options) => {
-      let { snapshots, units, environment, json, } = options
+      let { snapshots, units, environment, output, } = options
       match snapshots {
-        Single(root) => emit(scan_snapshot(root, units, environment), json)
-        BaselineCandidate(baseline, candidate) =>
-          emit_comparison(
-            @preflight.compare_reports(
-              scan_snapshot(baseline, units, environment),
-              scan_snapshot(candidate, units, environment),
-            ),
-            json,
+        Single(root) => {
+          let report = scan_snapshot(root, units, environment)
+          if output == "--sarif" {
+            emit_scan_sarif(report, root)
+          } else {
+            emit(report, output == "--json")
+          }
+        }
+        BaselineCandidate(baseline, candidate) => {
+          let report = @preflight.compare_reports(
+            scan_snapshot(baseline, units, environment),
+            scan_snapshot(candidate, units, environment),
           )
+          if output == "--sarif" {
+            emit_comparison_sarif(report, baseline, candidate)
+          } else {
+            emit_comparison(report, output == "--json")
+          }
+        }
       }
     }
   }

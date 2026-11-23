@@ -89,6 +89,36 @@ def main():
         reversed_units = scan("argument-order-independent", samples / "conflict", 1, "--ipv6", "enabled",
                               units=("public.socket", "admin.socket"), conflicts=1)
         assert reversed_units == conflicted
+
+        if patch >= 19:
+            encoded = workspace / "review space #"
+            shutil.copytree(samples / "conflict", encoded)
+            proc = cli(["compare", "--baseline", "examples/fixed", "--candidate", encoded.name,
+                        "--ipv6", "enabled", "--sarif", "admin.socket", "public.socket"])
+            report = json.loads(proc.stdout)
+            assert proc.returncode == 1 and report["version"] == "2.1.0"
+            run, = report["runs"]
+            assert run["originalUriBaseIds"]["%SRCROOT%"]["uri"].endswith("/")
+            assert run["tool"]["driver"]["semanticVersion"] == version.split("v", 1)[1]
+            finding, = run["results"]
+            assert finding["ruleId"] == "TCP_BIND_OVERLAP" and finding["level"] == "error"
+            first = finding["locations"][0]["physicalLocation"]
+            second = finding["relatedLocations"][0]["physicalLocation"]
+            assert first["region"]["startLine"] == 2 and second["region"]["startLine"] == 5
+            assert first["artifactLocation"] == {
+                "uri": "review%20space%20%23/" + ADMIN + "admin.socket.d/20-site.conf",
+                "uriBaseId": "%SRCROOT%",
+            }
+            results.append({"case": "sarif-review-points-to-both-lines", "status": "regression"})
+            unknown_sarif = cli(["scan", "--root", "examples/conflict", "--sarif",
+                                 "admin.socket", "public.socket"])
+            diagnostic, = json.loads(unknown_sarif.stdout)["runs"][0]["results"]
+            assert unknown_sarif.returncode == 2 and diagnostic["ruleId"] == "INCOMPLETE_INPUT"
+            results.append({"case": "sarif-retains-coverage-gap", "status": "inconclusive"})
+            invalid = cli(["scan", "--root", "examples/conflict", "--json", "--sarif", "admin.socket"])
+            failure, = json.loads(invalid.stdout)["runs"]
+            assert invalid.returncode == 3 and not failure["invocations"][0]["executionSuccessful"]
+            results.append({"case": "sarif-rejects-conflicting-output-formats", "status": "input_error"})
         fixed = scan("shipped-reset-snapshot", samples / "fixed", 0, "--ipv6", "enabled")
         assert fixed["units"][0]["active_listen"][0]["value"] == "127.0.0.1:45393"
         assert [event["value"] for event in fixed["units"][0]["resets"][0]["cleared"]] == ["127.0.0.1:45392", "127.0.0.1:45391"]
