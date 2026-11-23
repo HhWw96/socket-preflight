@@ -49,10 +49,10 @@ def run_cli(node, entry, *args, code):
 
 
 def check_plans(node, entry, example, checks):
-    def gate(label, plan, code, schema=1):
+    def gate(label, plan, code, schema=1, status=None):
         report = run_cli(node, entry, "rollout", "--plan", str(plan), "--json", code=code)
         assert report["schema_version"] == schema
-        assert report["status"] == {0: "clear", 1: "regression", 2: "inconclusive", 3: "input_error"}[code]
+        assert report["status"] == (status or {0: "clear", 1: "regression", 2: "inconclusive", 3: "input_error"}[code])
         checks[label] = {"exit_code": code, "complete": report["complete"]}
         return report
 
@@ -132,6 +132,24 @@ def check_plans(node, entry, example, checks):
         stages[1]["name"] = "candidate"
         plan.write_text(json.dumps(staged_plan), encoding="utf-8")
         gate("reserved-checkpoint-name", plan, 3)
+
+        if int(entry.stem.rsplit(".", 1)[-1]) >= 18:
+            old = dict(raw["transition"])
+            phase = {"name": "coexist", **old}
+            policy_plan = {**staged_plan, "baseline": old, "checkpoints": [phase]}
+            plan.write_text(json.dumps(policy_plan), encoding="utf-8")
+            gate("existing-conflict-continues-with-default-policy", plan, 0, schema=2)
+            policy_plan["policy"] = "require-clear"
+            plan.write_text(json.dumps(policy_plan), encoding="utf-8")
+            blocked = gate("strict-policy-blocks-existing-conflict", plan, 1, schema=2, status="conflict")
+            stage = blocked["checkpoints"][0]["result"]
+            assert len(stage["existing_conflicts"]) == 1 and not stage["new_conflicts"]
+            policy_plan["checkpoints"] = [{**phase, "root": "fixed"}]
+            plan.write_text(json.dumps(policy_plan), encoding="utf-8")
+            gate("strict-policy-allows-a-resolved-baseline-conflict", plan, 0, schema=2)
+            policy_plan["policy"] = "typo"
+            plan.write_text(json.dumps(policy_plan), encoding="utf-8")
+            gate("strict-policy-spelling-is-validated", plan, 3)
 
 
 def verify(archive, receipt):

@@ -103,13 +103,19 @@ def validate_plan_roots(content, paths):
     if not isinstance(plan, dict):
         raise ValueError("plan.json must contain an object")
     schema = plan.get("schema_version")
+    policy = "new-conflicts"
     stages = [(name, plan.get(name)) for name in ("baseline", "candidate")]
     if schema == 2:
+        policy = plan.get("policy", policy)
+        if policy not in ("new-conflicts", "require-clear"):
+            raise ValueError("Policy must be new-conflicts or require-clear")
         checkpoints = plan.get("checkpoints")
         if not isinstance(checkpoints, list) or len(checkpoints) > 8 or "transition" in plan:
             raise ValueError("Schema 2 requires up to eight checkpoints")
         stages.extend((f"checkpoint {index}", stage) for index, stage in enumerate(checkpoints, 1))
     elif schema == 1:
+        if "policy" in plan:
+            raise ValueError("A rollout policy requires schema 2")
         if "transition" in plan:
             stages.append(("transition", plan["transition"]))
     else:
@@ -126,6 +132,7 @@ def validate_plan_roots(content, paths):
             raise ValueError(f"{name} root must stay inside the ZIP") from error
         if paths.get(relative.casefold()) != (relative, True):
             raise ValueError(f"{name} root is not a directory in the ZIP: {relative!r}")
+    return policy
 
 
 def save_receipt(path, receipt):
@@ -156,7 +163,7 @@ def run_gate(bundle, cli):
             staging.mkdir()
             paths = extract_bundle(data, staging)
             plan = staging / "plan.json"
-            validate_plan_roots(plan.read_bytes(), paths)
+            policy = validate_plan_roots(plan.read_bytes(), paths)
             local_cli = private / "socket-preflight.cjs"
             local_cli.write_bytes(executable)
             proc = subprocess.run(["node", local_cli, "rollout", "--plan", plan, "--json"],
@@ -164,6 +171,8 @@ def run_gate(bundle, cli):
             result = json.loads(proc.stdout)
             code = proc.returncode
             expected = {0: "clear", 1: "regression", 2: "inconclusive", 3: "input_error"}
+            if policy == "require-clear":
+                expected[1] = "conflict"
             if (not isinstance(result, dict) or code not in expected
                     or result.get("exit_code") != code or result.get("status") != expected[code]
                     or (code == 0 and result.get("complete") is not True)):

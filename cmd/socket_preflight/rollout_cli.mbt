@@ -49,7 +49,7 @@ fn load_plan_stage(
 ///|
 priv enum LoadedRollout {
   Legacy(@preflight.RolloutInput)
-  Named(@preflight.CheckpointRolloutInput)
+  Named(@preflight.CheckpointRolloutInput, Bool)
 }
 
 ///|
@@ -70,6 +70,8 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
   }
   let transition = fields.get("transition")
   let legacy_fields = if transition is Some(_) { 5 } else { 4 }
+  let policy = fields.get("policy")
+  let named_fields = if policy is Some(_) { 6 } else { 5 }
   guard fields.get("schema_version") is Some(Number(schema, ..)) &&
     fields.get("environment") is Some(Object(environment)) &&
     environment.length() == 2 &&
@@ -80,14 +82,19 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
     )
   }
   let checkpoints = match (schema, fields.get("checkpoints")) {
-    (1.0, None) if fields.length() == legacy_fields => None
-    (2.0, Some(Array(stages))) if fields.length() == 5 &&
+    (1.0, None) if fields.length() == legacy_fields && policy is None => None
+    (2.0, Some(Array(stages))) if fields.length() == named_fields &&
       transition is None &&
       stages.length() <= @preflight.max_checkpoints => Some(stages)
     _ =>
       return Err(
         "Use schema_version 1 with optional transition, or schema_version 2 with up to \{@preflight.max_checkpoints} checkpoints.",
       )
+  }
+  let require_clear = match policy {
+    None | Some(String("new-conflicts")) => false
+    Some(String("require-clear")) => true
+    _ => return Err("Policy must be new-conflicts or require-clear.")
   }
   let environment : @preflight.Environment = { ipv6, bindv6only, }
   let limit = 4 * 1024 * 1024
@@ -121,7 +128,7 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
         Err(message) => return Err(message)
       }
     }
-    return Ok(Named({ baseline, candidate, checkpoints: stages, environment, }))
+    return Ok(Named({ baseline, candidate, checkpoints: stages, environment, }, require_clear))
   }
   budget.remaining = limit
   let transition = match transition {
@@ -185,8 +192,13 @@ fn run_rollout(args : ArrayView[String]) -> Unit {
   }
   let report = match input {
     Ok(Legacy(plan)) => @preflight.analyze_rollout(plan)
-    Ok(Named(plan)) => {
-      emit_checkpoint_rollout(@preflight.analyze_checkpoint_rollout(plan), json)
+    Ok(Named(plan, require_clear)) => {
+      let result = if require_clear {
+        @preflight.analyze_strict_checkpoint_rollout(plan)
+      } else {
+        @preflight.analyze_checkpoint_rollout(plan)
+      }
+      emit_checkpoint_rollout(result, json)
       return
     }
     Err(message) => @preflight.rollout_error(message)

@@ -69,6 +69,21 @@ fn checkpoint_rollout_error(message : String) -> CheckpointRolloutReport {
 /// Evaluate each ordered checkpoint and the final candidate against the same
 /// baseline. Results at individual checkpoints reuse the candidate's baseline.
 pub fn analyze_checkpoint_rollout(input : CheckpointRolloutInput) -> CheckpointRolloutReport {
+  analyze_checkpoints(input, false)
+}
+
+///|
+/// Require every declared checkpoint and the candidate to have zero confirmed
+/// active conflicts, including conflicts already present in the baseline.
+pub fn analyze_strict_checkpoint_rollout(input : CheckpointRolloutInput) -> CheckpointRolloutReport {
+  analyze_checkpoints(input, true)
+}
+
+///|
+fn analyze_checkpoints(
+  input : CheckpointRolloutInput,
+  require_clear : Bool,
+) -> CheckpointRolloutReport {
   if !valid_environment(input.environment) {
     return checkpoint_rollout_error("Invalid target IPv6 environment.")
   }
@@ -95,6 +110,13 @@ pub fn analyze_checkpoint_rollout(input : CheckpointRolloutInput) -> CheckpointR
   let outcomes = checkpoints.map(checkpoint => checkpoint.result)
   outcomes.push(candidate)
   let (status, exit_code, complete) = rollout_outcome(outcomes)
+  let (status, exit_code) = if require_clear &&
+    exit_code != 3 &&
+    outcomes.any(result => result.candidate.map_or(false, scan => scan.conflict_count > 0)) {
+    ("conflict", 1)
+  } else {
+    (status, exit_code)
+  }
   {
     schema_version: 2,
     version,

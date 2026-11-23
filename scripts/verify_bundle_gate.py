@@ -114,6 +114,14 @@ def verify(release, inputs):
             multistage["checkpoints"] = [{"name": "during", **plan["transition"]}]
             result = variant("named-checkpoint-deployment-bundle", updated_plan=multistage, expected=1)
             assert result["rollout"]["checkpoints"][0]["result"]["new_conflicts"][0]["port"] == 9090
+            if int(entry.rsplit(".", 2)[-2]) >= 18:
+                carried = {**multistage, "baseline": plan["transition"]}
+                variant("default-policy-allows-existing-conflict", updated_plan=carried, expected=0)
+                strict = variant("strict-policy-blocks-existing-conflict",
+                                 updated_plan={**carried, "policy": "require-clear"}, expected=1)
+                assert strict["rollout"]["status"] == "conflict"
+                comparison = strict["rollout"]["checkpoints"][0]["result"]
+                assert comparison["existing_conflicts"] and not comparison["new_conflicts"]
             multistage["checkpoints"][0]["root"] = "../outside"
             rejected = variant("checkpoint-root-stays-inside-bundle", updated_plan=multistage)
             assert rejected["rollout"] is None

@@ -12,6 +12,8 @@ pub fn analyze_checkpoint_rollout(CheckpointRolloutInput) -> CheckpointRolloutRe
 
 pub fn analyze_rollout(RolloutInput) -> RolloutReport
 
+pub fn analyze_strict_checkpoint_rollout(CheckpointRolloutInput) -> CheckpointRolloutReport
+
 pub fn command_error(String) -> Report
 
 pub fn compare_reports(Report, Report) -> Comparison
