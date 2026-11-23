@@ -76,6 +76,7 @@ def main():
     payload = [(entry.name, entry)]
     payload.extend((name, ROOT / name) for name in (*DOCUMENTS, "DEMO.md"))
     payload.append(("gate_bundle.py", ROOT / "scripts/gate_bundle.py"))
+    payload.append(("package_deployment.py", ROOT / "scripts/package_deployment.py"))
     payload.append(("deployment_pipeline.py", ROOT / "scripts/deployment_pipeline.py"))
     for name in ("debian-bad.zip", "debian-fixed.zip"):
         payload.append((f"samples/{name}", ROOT / "verification/debian" / name))

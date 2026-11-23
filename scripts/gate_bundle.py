@@ -46,42 +46,48 @@ def safe_parts(name):
     return parts
 
 
+def index_bundle(archive):
+    entries = archive.infolist()
+    if len(entries) > MAX_ENTRIES or sum(member.file_size for member in entries) > MAX_EXPANDED:
+        raise ValueError("ZIP exceeds the entry or expanded-size limit")
+
+    # Include implied directories so case and prefix collisions are rejected
+    # before the first write, on case-sensitive and case-insensitive hosts.
+    paths = {}
+    explicit = set()
+    resolved = []
+    for member in entries:
+        name = member.orig_filename
+        is_directory = member.is_dir()
+        mode = stat.S_IFMT(member.external_attr >> 16)
+        if (member.filename != name or member.flag_bits & 1
+                or member.external_attr & 0x400
+                or member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
+                or mode not in (0, stat.S_IFDIR if is_directory else stat.S_IFREG)
+                or (is_directory and member.file_size)):
+            raise ValueError(f"Unsupported ZIP entry: {name!r}")
+        parts = safe_parts(name[:-1] if is_directory else name)
+        for index in range(1, len(parts) + 1):
+            path = "/".join(parts[:index])
+            key = path.casefold()
+            current = (path, index < len(parts) or is_directory)
+            if paths.setdefault(key, current) != current:
+                raise ValueError(f"Case or type collision in ZIP: {path!r}")
+        if key in explicit:
+            raise ValueError(f"Duplicate ZIP entry: {path!r}")
+        explicit.add(key)
+        resolved.append((member, parts))
+
+    if paths.get("plan.json") != ("plan.json", False):
+        raise ValueError("ZIP must contain plan.json at its root")
+    return paths, resolved
+
+
 def extract_bundle(data, directory):
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        entries = archive.infolist()
-        if len(entries) > MAX_ENTRIES or sum(member.file_size for member in entries) > MAX_EXPANDED:
-            raise ValueError("ZIP exceeds the entry or expanded-size limit")
-
-        # Include implied directories so case and prefix collisions are rejected
-        # before the first write, on case-sensitive and case-insensitive hosts.
-        paths = {}
-        explicit = set()
-        resolved = []
-        for member in entries:
-            name = member.orig_filename
-            is_directory = member.is_dir()
-            mode = stat.S_IFMT(member.external_attr >> 16)
-            if (member.filename != name or member.flag_bits & 1
-                    or member.external_attr & 0x400
-                    or member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
-                    or mode not in (0, stat.S_IFDIR if is_directory else stat.S_IFREG)
-                    or (is_directory and member.file_size)):
-                raise ValueError(f"Unsupported ZIP entry: {name!r}")
-            parts = safe_parts(name[:-1] if is_directory else name)
-            for index in range(1, len(parts) + 1):
-                path = "/".join(parts[:index])
-                key = path.casefold()
-                current = (path, index < len(parts) or is_directory)
-                if paths.setdefault(key, current) != current:
-                    raise ValueError(f"Case or type collision in ZIP: {path!r}")
-            if key in explicit:
-                raise ValueError(f"Duplicate ZIP entry: {path!r}")
-            explicit.add(key)
-            resolved.append((member, directory.joinpath(*parts)))
-
-        if paths.get("plan.json") != ("plan.json", False):
-            raise ValueError("ZIP must contain plan.json at its root")
-        for member, target in resolved:
+        paths, entries = index_bundle(archive)
+        for member, parts in entries:
+            target = directory.joinpath(*parts)
             if member.is_dir():
                 target.mkdir(parents=True, exist_ok=True)
             else:
@@ -90,8 +96,10 @@ def extract_bundle(data, directory):
     return paths
 
 
-def validate_plan_roots(plan_file, paths):
-    plan = json.loads(plan_file.read_text(encoding="utf-8"))
+def validate_plan_roots(content, paths):
+    if len(content) > 256 * 1024:
+        raise ValueError("plan.json exceeds 256 KiB")
+    plan = json.loads(content.decode("utf-8"))
     if not isinstance(plan, dict):
         raise ValueError("plan.json must contain an object")
     for name in ("baseline", "transition", "candidate"):
@@ -139,7 +147,7 @@ def run_gate(bundle, cli):
             staging.mkdir()
             paths = extract_bundle(data, staging)
             plan = staging / "plan.json"
-            validate_plan_roots(plan, paths)
+            validate_plan_roots(plan.read_bytes(), paths)
             local_cli = private / "socket-preflight.cjs"
             local_cli.write_bytes(executable)
             proc = subprocess.run(["node", local_cli, "rollout", "--plan", plan, "--json"],

@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 import stat
@@ -32,6 +33,9 @@ def verify(release, inputs):
             cli.write_bytes(archive.read(entry))
             gate = tool / "gate_bundle.py"
             gate.write_bytes(archive.read(gate.name))
+            pack = tool / "package_deployment.py"
+            if pack.name in archive.namelist():
+                pack.write_bytes(archive.read(pack.name))
         cli_hash = sha(cli)
 
         def run(name, bundle, expected):
@@ -57,6 +61,37 @@ def verify(release, inputs):
         assert finding["second"]["setting"]["source"]["line"] == 3
         assert not result["rollout"]["candidate"]["new_conflicts"]
         assert run("fixed", fixed, 0)["rollout"]["complete"]
+
+        if pack.is_file():
+            def package(source, output, expected):
+                result = subprocess.run([sys.executable, pack, "--input", source,
+                                         "--output", output], capture_output=True, timeout=30)
+                assert result.returncode == expected, (result.stdout, result.stderr)
+                return result
+
+            source = root / "prepared"
+            with zipfile.ZipFile(fixed) as archive:
+                archive.extractall(source)
+            (source / "empty").mkdir()
+            first, second = root / "repacked.zip", root / "repacked-again.zip"
+            assert package(source, first, 0).stdout.decode().strip() == sha(first)
+            os.utime(source / "plan.json", (1_700_000_000, 1_700_000_000))
+            package(source, second, 0)
+            assert first.read_bytes() == second.read_bytes()
+            with zipfile.ZipFile(first) as archive:
+                assert "empty/" in archive.namelist()
+            assert run("repacked-fixed", first, 0)["rollout"]["complete"]
+            package(source, first, 3)
+            assert first.read_bytes() == second.read_bytes()
+            checks["package-repeatable-and-no-overwrite"] = {"pass": True}
+            plan_path = source / "plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["candidate"]["root"] = "missing"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            missing_root = root / "missing-root.zip"
+            package(source, missing_root, 3)
+            assert not missing_root.exists()
+            checks["package-validates-stage-roots"] = {"pass": True}
 
         with zipfile.ZipFile(bad) as archive:
             entries = {name: archive.read(name) for name in archive.namelist()}
