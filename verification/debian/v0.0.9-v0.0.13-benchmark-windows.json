@@ -1,0 +1,229 @@
+{
+  "host": "Windows-11-10.0.22000-SP0",
+  "node": "v24.13.0",
+  "baseline": {
+    "file": "socket-preflight-v0.0.9.cjs",
+    "sha256": "1ff0e0a63a83ff1c4436c01ec97b6234ee894718d1340d43c18114aa0478ea80",
+    "version": "SocketPreflight v0.0.9"
+  },
+  "candidate": {
+    "file": "socket-preflight-v0.0.13.cjs",
+    "sha256": "15f613e93cadd00876a843fe782058a2eab4125b118d1371efc8f284dbc87692",
+    "version": "SocketPreflight v0.0.13"
+  },
+  "runs_per_version_per_case": 5,
+  "warmups_per_version_per_case": 2,
+  "measurement": "Warm-cache CLI wall time including Node startup and JSON output capture. FS call counts from separate runs.",
+  "workloads": {
+    "shipped_pair": {
+      "exit_code": 1,
+      "expected_conflicts": 1,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 102.608,
+        "min_ms": 100.684,
+        "max_ms": 107.774,
+        "samples_ms": [
+          101.781,
+          100.684,
+          102.608,
+          107.774,
+          104.331
+        ],
+        "fs_calls": {
+          "lstatSync": 41,
+          "realpathNative": 26,
+          "opendirSync": 2,
+          "openSync": 3
+        }
+      },
+      "candidate": {
+        "median_ms": 103.56,
+        "min_ms": 101.787,
+        "max_ms": 114.282,
+        "samples_ms": [
+          107.157,
+          101.895,
+          103.56,
+          114.282,
+          101.787
+        ],
+        "fs_calls": {
+          "lstatSync": 41,
+          "realpathNative": 26,
+          "opendirSync": 2,
+          "openSync": 3
+        }
+      },
+      "median_change_percent": 0.9
+    },
+    "inherited_drop_ins_64_units": {
+      "exit_code": 0,
+      "expected_conflicts": 0,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 716.803,
+        "min_ms": 702.962,
+        "max_ms": 745.175,
+        "samples_ms": [
+          702.962,
+          723.224,
+          711.891,
+          745.175,
+          716.803
+        ],
+        "fs_calls": {
+          "lstatSync": 1950,
+          "realpathNative": 1358,
+          "opendirSync": 4,
+          "openSync": 256
+        }
+      },
+      "candidate": {
+        "median_ms": 720.637,
+        "min_ms": 704.793,
+        "max_ms": 733.971,
+        "samples_ms": [
+          704.793,
+          720.637,
+          705.724,
+          729.885,
+          733.971
+        ],
+        "fs_calls": {
+          "lstatSync": 1950,
+          "realpathNative": 1358,
+          "opendirSync": 4,
+          "openSync": 256
+        }
+      },
+      "median_change_percent": 0.5
+    },
+    "sparse_same_port_512_listeners": {
+      "exit_code": 0,
+      "expected_conflicts": 0,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 319.145,
+        "min_ms": 314.582,
+        "max_ms": 321.132,
+        "samples_ms": [
+          320.96,
+          316.825,
+          314.582,
+          319.145,
+          321.132
+        ],
+        "fs_calls": {
+          "lstatSync": 524,
+          "realpathNative": 388,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "candidate": {
+        "median_ms": 319.558,
+        "min_ms": 316.932,
+        "max_ms": 331.905,
+        "samples_ms": [
+          318.116,
+          319.558,
+          330.087,
+          331.905,
+          316.932
+        ],
+        "fs_calls": {
+          "lstatSync": 524,
+          "realpathNative": 388,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "median_change_percent": 0.1
+    },
+    "dense_same_port_512_listeners": {
+      "exit_code": 1,
+      "expected_conflicts": 129024,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 339.098,
+        "min_ms": 330.62,
+        "max_ms": 349.425,
+        "samples_ms": [
+          339.098,
+          349.425,
+          338.031,
+          340.588,
+          330.62
+        ],
+        "fs_calls": {
+          "lstatSync": 524,
+          "realpathNative": 388,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "candidate": {
+        "median_ms": 335.295,
+        "min_ms": 329.742,
+        "max_ms": 347.722,
+        "samples_ms": [
+          330.991,
+          329.742,
+          335.295,
+          338.8,
+          347.722
+        ],
+        "fs_calls": {
+          "lstatSync": 524,
+          "realpathNative": 388,
+          "opendirSync": 0,
+          "openSync": 64
+        }
+      },
+      "median_change_percent": -1.1
+    },
+    "compare_two_64_unit_snapshots": {
+      "exit_code": 1,
+      "expected_conflicts": 1,
+      "output_equivalent": true,
+      "baseline": {
+        "median_ms": 1394.062,
+        "min_ms": 1303.884,
+        "max_ms": 1457.053,
+        "samples_ms": [
+          1303.884,
+          1382.989,
+          1394.062,
+          1450.182,
+          1457.053
+        ],
+        "fs_calls": {
+          "lstatSync": 3906,
+          "realpathNative": 2722,
+          "opendirSync": 9,
+          "openSync": 513
+        }
+      },
+      "candidate": {
+        "median_ms": 1409.267,
+        "min_ms": 1368.933,
+        "max_ms": 1502.168,
+        "samples_ms": [
+          1368.933,
+          1377.725,
+          1433.288,
+          1502.168,
+          1409.267
+        ],
+        "fs_calls": {
+          "lstatSync": 3906,
+          "realpathNative": 2722,
+          "opendirSync": 9,
+          "openSync": 513
+        }
+      },
+      "median_change_percent": 1.1
+    }
+  }
+}

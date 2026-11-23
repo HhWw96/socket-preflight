@@ -1,0 +1,108 @@
+name: Debian deployment gate rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      case:
+        description: Debian deployment example
+        type: choice
+        options: [bad, fixed]
+        required: true
+      release_tag:
+        description: Tag of the published SocketPreflight ZIP
+        type: string
+        required: true
+      release_sha256:
+        description: Expected SHA-256 of that release ZIP
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Select the deployment ZIP from the checked release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA256: ${{ inputs.release_sha256 }}
+          SELECTED_CASE: ${{ inputs.case }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import zipfile
+
+          tag = os.environ["RELEASE_TAG"]
+          expected_hash = os.environ["RELEASE_SHA256"].lower()
+          case = os.environ["SELECTED_CASE"]
+          if (not re.fullmatch(r"v0\.0\.\d+", tag) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash)
+                  or case not in {"bad", "fixed"}):
+              raise SystemExit("Invalid release tag, checksum or case")
+          stem = f"socket-preflight-{tag}"
+          destination = Path(os.environ["RUNNER_TEMP"])
+          subprocess.run(["gh", "release", "download", tag, "--repo", os.environ["GITHUB_REPOSITORY"],
+                          "--pattern", stem + ".zip", "--dir", destination], check=True)
+          archive = destination / (stem + ".zip")
+          if hashlib.sha256(archive.read_bytes()).hexdigest() != expected_hash:
+              raise SystemExit("Published release ZIP has a different SHA-256")
+          handoff = Path("handoff")
+          handoff.mkdir()
+          with zipfile.ZipFile(archive) as bundle:
+              for member, name in ((stem + ".cjs", "socket-preflight.cjs"),
+                                   ("gate_bundle.py", "gate_bundle.py"),
+                                   ("deployment_pipeline.py", "deployment_pipeline.py"),
+                                   (f"samples/debian-{case}.zip", "deployment.zip")):
+                  (handoff / name).write_bytes(bundle.read(member))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: deployment-inputs
+          path: handoff/
+          if-no-files-found: error
+
+  gate:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: deployment-inputs
+          path: incoming/
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.13.0'
+      - name: Gate the exact ZIP
+        run: python3 incoming/gate_bundle.py --bundle incoming/deployment.zip --cli incoming/socket-preflight.cjs --report receipt.json
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: gate-receipt
+          path: receipt.json
+          if-no-files-found: error
+
+  release-rehearsal:
+    needs: gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: deployment-inputs
+          path: incoming/
+      - uses: actions/download-artifact@v8
+        with:
+          name: gate-receipt
+          path: reports/
+      - name: Check identity of the approved ZIP and CLI
+        run: python3 incoming/deployment_pipeline.py release --bundle incoming/deployment.zip --cli incoming/socket-preflight.cjs --receipt reports/receipt.json --marker would-deploy.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: would-deploy
+          path: would-deploy.json
+          if-no-files-found: error

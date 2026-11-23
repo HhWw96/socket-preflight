@@ -1,5 +1,24 @@
 # SocketPreflight 验证记录
 
+## v0.0.10 至 v0.0.13 · 部署 ZIP 门禁
+
+样本使用经过 SHA-256 核验的 Debian 13 amd64 发行包。两份部署 ZIP 内的 `provenance.json` 记录原包、单元文件和版权信息的来源。原始 `cockpit.socket` 和 `ssh.socket` 保持逐字节一致。SSH 改用 `9090` 或 `19091` 的 drop-in 为实验新增。[坏例 ZIP](debian/debian-bad.zip) · [修正版 ZIP](debian/debian-fixed.zip) · [用 v0.0.9 的首次判定](debian/v0.0.10-existing-rollout.json)
+
+| 版本 | 已执行证据 |
+| --- | --- |
+| v0.0.10 | 原件 SHA-256 验证。坏例指出 `cockpit.socket:7` 和 `20-move-port.conf:3`，修正版退出 0。 |
+| v0.0.11 | 门禁 13 项检查在 [Windows](debian/v0.0.11-gate-windows.json) 和 [Debian](debian/v0.0.11-gate-linux.json) 均通过。 |
+| v0.0.12 | [systemd 257，4 个阶段、18 次实际试验](debian/v0.0.12-systemd.jsonl)。坏例共存的 6 次均因 `EADDRINUSE` 失败，修正版共存的 6 次均成功。 |
+| v0.0.13 | [Windows 发行包](debian/v0.0.13-release-windows.json) · [Debian 发行包](debian/v0.0.13-release-linux.json) · [Windows ZIP 门禁](debian/v0.0.13-gate-windows.json) · [Debian ZIP 门禁](debian/v0.0.13-gate-linux.json) |
+
+两端各通过 14 项最终 ZIP 门禁验证。流水线演练另外核对 3 种情况。坏例保存报告且不写放行标记，修正版核对部署 ZIP 和工具哈希后写入标记，审核后替换 ZIP 会被拒绝。两个平台的流水线回执逐项匹配 Debian manager 的生效监听和实际绑定结果。[Windows 演练](debian/v0.0.13-pipeline-windows.json) · [Debian 演练](debian/v0.0.13-pipeline-linux.json)
+
+实测使用 Debian 13 用户空间、WSL2 内核和 systemd `257.13-1~deb13u1`。临时实例使用校验过的 Debian amd64 OCI 清单 `sha256:bfc36aecdece0387418759dba474aa856c026ca8087da3606b41b90ab0509c99`。实验在各自私有网络命名空间内运行，采用实际测得的 `net.ipv6.bindv6only=0`。回执记录用于隔离的 drop-in 和服务占位配置。临时 Debian 已清理。[Debian 根文件系统来源](https://docker.debian.net/)
+
+工作流结构和从冻结发行包挑选输入的代码已经本地验证。GitHub 托管运行及非作者复跑待回执。[本地工作流检查](debian/v0.0.13-workflow-local.json) · [工作流](../.github/workflows/debian-deployment.yml) · [复跑演示](../DEMO.md)
+
+与 v0.0.9 的五组旧场景基准在两个平台的业务输出均一致，每组每版交替采样五次。[Windows 基准](debian/v0.0.9-v0.0.13-benchmark-windows.json) · [Debian 基准](debian/v0.0.9-v0.0.13-benchmark-linux.json) · [冻结清单](debian/v0.0.13-freeze.json) · [源码快照](debian/v0.0.13-source.zip)
+
 ## v0.0.6 至 v0.0.9 · 部署切换
 
 测试配置依据公开事故重建。实验使用独立 Ubuntu 24.04.5 / WSL2 的 systemd 255，四组快照分别装入 manager。启动操作限制在各自的私有网络命名空间。[原始问题](https://github.com/systemd/systemd/issues/14044)

@@ -1,0 +1,17 @@
+{
+  "validation": "workflow parsed and preparation code executed with a local release transport",
+  "hosted_runs": false,
+  "workflow_sha256": "9127927bef5c57b7fd00d9bc8999d33be385dfc1623b2cf86d4f68c429752de0",
+  "release_sha256": "3a5bd85ac4633ede79fc9dbac87610d1acef301aea54a4c2403f6c7b96157330",
+  "checks": {
+    "bad": {
+      "bundle_sha256": "70fe19d16482a5e3ab9a11cb88d98608ee6caf8bfc385c826a815b4722fad68e"
+    },
+    "fixed": {
+      "bundle_sha256": "5d2c0b5d759b8fa29da756679a3bbc57246fa10100ffc7a9038d238931b84ba6"
+    },
+    "invalid_checksum": {
+      "blocked": true
+    }
+  }
+}

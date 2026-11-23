@@ -34,16 +34,16 @@ def fixture(root, stage):
     return data
 
 
-def single_start(namespace, name):
+def single_start(namespace, name, ports=None):
     start = run("systemctl", "start", name, check=False)
     state = properties(name)
-    listeners = listeners_in(namespace)
+    listeners = listeners_in(namespace, ports)
     active_list = run("systemctl", "list-sockets", "--no-legend", "--no-pager", name, check=False)
     run("systemctl", "stop", name)
     return {"unit": name, "start_exit": start.returncode, "start_stderr": start.stderr,
             "state": state, "listeners": listeners, "list_sockets_while_active": active_list.stdout,
             "pass": start.returncode == 0 and state["SubState"] == "listening"
-                    and len(listeners) == 1 and not listeners_in(namespace)}
+                    and len(listeners) == 1 and not listeners_in(namespace, ports)}
 
 
 def verify_stage(root, stage):

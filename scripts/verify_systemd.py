@@ -140,12 +140,14 @@ def ports_in_property(values):
     return sorted(int(port) for value in values for port in re.findall(r":(4539[1-4]) \(Stream\)", value))
 
 
-def listeners_in(namespace):
+def listeners_in(namespace, ports=None):
     output = run("nsenter", "--net=" + namespace, "ss", "-H", "-ltn").stdout
+    if ports is not None:
+        return [row for row in output.splitlines() if row.split()[3].rsplit(":", 1)[-1] in ports]
     return [row for row in output.splitlines() if re.search(r":4539[1-4]\b", row.split()[3])]
 
 
-def try_order(namespace, order, coexist, expected_counts, conflict_probe=None):
+def try_order(namespace, order, coexist, expected_counts, conflict_probe=None, ports=None):
     run("systemctl", "start", order[0])
     first = properties(order[0])
     since = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f UTC")
@@ -161,7 +163,7 @@ def try_order(namespace, order, coexist, expected_counts, conflict_probe=None):
             time.sleep(0.1)
         if conflict_probe:
             errno_name = conflict_probe(order[1])
-    listeners = listeners_in(namespace)
+    listeners = listeners_in(namespace, ports)
     expected_listeners = expected_counts[order[0]] + (expected_counts[order[1]] if coexist else 0)
     good = first.get("SubState") == "listening" and len(listeners) == expected_listeners
     if coexist:
@@ -179,7 +181,7 @@ def try_order(namespace, order, coexist, expected_counts, conflict_probe=None):
         result["kernel_bind_errno"] = errno_name
     run("systemctl", "stop", *order)
     run("systemctl", "reset-failed", *order, check=False)
-    if listeners_in(namespace):
+    if listeners_in(namespace, ports):
         raise RuntimeError("Test listeners did not close between runs")
     return result
 

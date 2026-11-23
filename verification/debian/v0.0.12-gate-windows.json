@@ -1,0 +1,1237 @@
+{
+  "host": "Windows-11-10.0.22000-SP0",
+  "release_sha256": "b1a3520ce2ed6499d3a5852cc44d8dfe23a15f0894cb40fe9e694b71b7101a70",
+  "checks": {
+    "bad": {
+      "schema_version": 1,
+      "bundle_sha256": "70fe19d16482a5e3ab9a11cb88d98608ee6caf8bfc385c826a815b4722fad68e",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 1,
+      "rollout": {
+        "schema_version": 1,
+        "version": "0.0.12",
+        "status": "regression",
+        "exit_code": 1,
+        "complete": true,
+        "transition": {
+          "schema_version": 1,
+          "version": "0.0.12",
+          "status": "regression",
+          "exit_code": 1,
+          "complete": true,
+          "baseline": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "both"
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "candidate": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "conflict",
+            "exit_code": 1,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "both"
+                  }
+                ],
+                "issues": []
+              },
+              {
+                "name": "ssh.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/ssh.socket",
+                  "drop_ins": [
+                    "etc/systemd/system/ssh.socket.d/20-move-port.conf"
+                  ],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "127.0.0.1:9090",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 3,
+                      "end_line": 3
+                    }
+                  }
+                ],
+                "resets": [
+                  {
+                    "key": "ListenStream",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 2,
+                      "end_line": 2
+                    },
+                    "cleared": [
+                      {
+                        "key": "ListenStream",
+                        "value": "22",
+                        "source": {
+                          "path": "usr/lib/systemd/system/ssh.socket",
+                          "line": 7,
+                          "end_line": 7
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "comparable_listeners": [
+                  {
+                    "unit": "ssh.socket",
+                    "endpoint": "127.0.0.1:9090",
+                    "address": "127.0.0.1",
+                    "port": 9090,
+                    "family": "ipv4",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "127.0.0.1:9090",
+                      "source": {
+                        "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                        "line": 3,
+                        "end_line": 3
+                      }
+                    }
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [
+              {
+                "code": "dual_stack_overlap",
+                "port": 9090,
+                "first": {
+                  "unit": "cockpit.socket",
+                  "endpoint": "[::]:9090",
+                  "address": "::",
+                  "port": 9090,
+                  "family": "ipv6",
+                  "setting": {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  },
+                  "ipv6_mode": "both"
+                },
+                "second": {
+                  "unit": "ssh.socket",
+                  "endpoint": "127.0.0.1:9090",
+                  "address": "127.0.0.1",
+                  "port": 9090,
+                  "family": "ipv4",
+                  "setting": {
+                    "key": "ListenStream",
+                    "value": "127.0.0.1:9090",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 3,
+                      "end_line": 3
+                    }
+                  }
+                }
+              }
+            ],
+            "conflict_count": 1,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "issues": [],
+          "new_conflicts": [
+            {
+              "code": "dual_stack_overlap",
+              "port": 9090,
+              "first": {
+                "unit": "cockpit.socket",
+                "endpoint": "[::]:9090",
+                "address": "::",
+                "port": 9090,
+                "family": "ipv6",
+                "setting": {
+                  "key": "ListenStream",
+                  "value": "9090",
+                  "source": {
+                    "path": "usr/lib/systemd/system/cockpit.socket",
+                    "line": 7,
+                    "end_line": 7
+                  }
+                },
+                "ipv6_mode": "both"
+              },
+              "second": {
+                "unit": "ssh.socket",
+                "endpoint": "127.0.0.1:9090",
+                "address": "127.0.0.1",
+                "port": 9090,
+                "family": "ipv4",
+                "setting": {
+                  "key": "ListenStream",
+                  "value": "127.0.0.1:9090",
+                  "source": {
+                    "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                    "line": 3,
+                    "end_line": 3
+                  }
+                }
+              }
+            }
+          ],
+          "existing_conflicts": [],
+          "resolved_conflicts": [],
+          "uncertain_new": [],
+          "uncertain_resolved": []
+        },
+        "candidate": {
+          "schema_version": 1,
+          "version": "0.0.12",
+          "status": "clear",
+          "exit_code": 0,
+          "complete": true,
+          "baseline": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "both"
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "candidate": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "ssh.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/ssh.socket",
+                  "drop_ins": [
+                    "etc/systemd/system/ssh.socket.d/20-move-port.conf"
+                  ],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "127.0.0.1:9090",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 3,
+                      "end_line": 3
+                    }
+                  }
+                ],
+                "resets": [
+                  {
+                    "key": "ListenStream",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 2,
+                      "end_line": 2
+                    },
+                    "cleared": [
+                      {
+                        "key": "ListenStream",
+                        "value": "22",
+                        "source": {
+                          "path": "usr/lib/systemd/system/ssh.socket",
+                          "line": 7,
+                          "end_line": 7
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "comparable_listeners": [
+                  {
+                    "unit": "ssh.socket",
+                    "endpoint": "127.0.0.1:9090",
+                    "address": "127.0.0.1",
+                    "port": 9090,
+                    "family": "ipv4",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "127.0.0.1:9090",
+                      "source": {
+                        "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                        "line": 3,
+                        "end_line": 3
+                      }
+                    }
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "issues": [],
+          "new_conflicts": [],
+          "existing_conflicts": [],
+          "resolved_conflicts": [],
+          "uncertain_new": [],
+          "uncertain_resolved": []
+        },
+        "issues": []
+      }
+    },
+    "fixed": {
+      "schema_version": 1,
+      "bundle_sha256": "5d2c0b5d759b8fa29da756679a3bbc57246fa10100ffc7a9038d238931b84ba6",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 0,
+      "rollout": {
+        "schema_version": 1,
+        "version": "0.0.12",
+        "status": "clear",
+        "exit_code": 0,
+        "complete": true,
+        "transition": {
+          "schema_version": 1,
+          "version": "0.0.12",
+          "status": "clear",
+          "exit_code": 0,
+          "complete": true,
+          "baseline": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "both"
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "candidate": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "both"
+                  }
+                ],
+                "issues": []
+              },
+              {
+                "name": "ssh.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/ssh.socket",
+                  "drop_ins": [
+                    "etc/systemd/system/ssh.socket.d/20-move-port.conf"
+                  ],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "127.0.0.1:19091",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 3,
+                      "end_line": 3
+                    }
+                  }
+                ],
+                "resets": [
+                  {
+                    "key": "ListenStream",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 2,
+                      "end_line": 2
+                    },
+                    "cleared": [
+                      {
+                        "key": "ListenStream",
+                        "value": "22",
+                        "source": {
+                          "path": "usr/lib/systemd/system/ssh.socket",
+                          "line": 7,
+                          "end_line": 7
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "comparable_listeners": [
+                  {
+                    "unit": "ssh.socket",
+                    "endpoint": "127.0.0.1:19091",
+                    "address": "127.0.0.1",
+                    "port": 19091,
+                    "family": "ipv4",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "127.0.0.1:19091",
+                      "source": {
+                        "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                        "line": 3,
+                        "end_line": 3
+                      }
+                    }
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "issues": [],
+          "new_conflicts": [],
+          "existing_conflicts": [],
+          "resolved_conflicts": [],
+          "uncertain_new": [],
+          "uncertain_resolved": []
+        },
+        "candidate": {
+          "schema_version": 1,
+          "version": "0.0.12",
+          "status": "clear",
+          "exit_code": 0,
+          "complete": true,
+          "baseline": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "both"
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "candidate": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "0"
+            },
+            "units": [
+              {
+                "name": "ssh.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/ssh.socket",
+                  "drop_ins": [
+                    "etc/systemd/system/ssh.socket.d/20-move-port.conf"
+                  ],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "127.0.0.1:9090",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 3,
+                      "end_line": 3
+                    }
+                  }
+                ],
+                "resets": [
+                  {
+                    "key": "ListenStream",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 2,
+                      "end_line": 2
+                    },
+                    "cleared": [
+                      {
+                        "key": "ListenStream",
+                        "value": "22",
+                        "source": {
+                          "path": "usr/lib/systemd/system/ssh.socket",
+                          "line": 7,
+                          "end_line": 7
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "comparable_listeners": [
+                  {
+                    "unit": "ssh.socket",
+                    "endpoint": "127.0.0.1:9090",
+                    "address": "127.0.0.1",
+                    "port": 9090,
+                    "family": "ipv4",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "127.0.0.1:9090",
+                      "source": {
+                        "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                        "line": 3,
+                        "end_line": 3
+                      }
+                    }
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "issues": [],
+          "new_conflicts": [],
+          "existing_conflicts": [],
+          "resolved_conflicts": [],
+          "uncertain_new": [],
+          "uncertain_resolved": []
+        },
+        "issues": []
+      }
+    },
+    "unmodelled_environment": {
+      "schema_version": 1,
+      "bundle_sha256": "9d961b90d3d5566fdf213b12ae8b0d2cdf08c9a1cfed80d2b37a7df7a85389ac",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 2,
+      "rollout": {
+        "schema_version": 1,
+        "version": "0.0.12",
+        "status": "inconclusive",
+        "exit_code": 2,
+        "complete": false,
+        "transition": {
+          "schema_version": 1,
+          "version": "0.0.12",
+          "status": "inconclusive",
+          "exit_code": 2,
+          "complete": false,
+          "baseline": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "inconclusive",
+            "exit_code": 2,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "unknown"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "unknown"
+                  }
+                ],
+                "issues": [
+                  {
+                    "severity": "uncovered",
+                    "code": "unknown_bindv6only",
+                    "message": "IPv4 overlap depends on the target net.ipv6.bindv6only. Supply --bindv6only 0 or 1.",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ]
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "candidate": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "inconclusive",
+            "exit_code": 2,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "unknown"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "unknown"
+                  }
+                ],
+                "issues": [
+                  {
+                    "severity": "uncovered",
+                    "code": "unknown_bindv6only",
+                    "message": "IPv4 overlap depends on the target net.ipv6.bindv6only. Supply --bindv6only 0 or 1.",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "ssh.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/ssh.socket",
+                  "drop_ins": [
+                    "etc/systemd/system/ssh.socket.d/20-move-port.conf"
+                  ],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "127.0.0.1:9090",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 3,
+                      "end_line": 3
+                    }
+                  }
+                ],
+                "resets": [
+                  {
+                    "key": "ListenStream",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 2,
+                      "end_line": 2
+                    },
+                    "cleared": [
+                      {
+                        "key": "ListenStream",
+                        "value": "22",
+                        "source": {
+                          "path": "usr/lib/systemd/system/ssh.socket",
+                          "line": 7,
+                          "end_line": 7
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "comparable_listeners": [
+                  {
+                    "unit": "ssh.socket",
+                    "endpoint": "127.0.0.1:9090",
+                    "address": "127.0.0.1",
+                    "port": 9090,
+                    "family": "ipv4",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "127.0.0.1:9090",
+                      "source": {
+                        "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                        "line": 3,
+                        "end_line": 3
+                      }
+                    }
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "issues": [],
+          "new_conflicts": [],
+          "existing_conflicts": [],
+          "resolved_conflicts": [],
+          "uncertain_new": [],
+          "uncertain_resolved": []
+        },
+        "candidate": {
+          "schema_version": 1,
+          "version": "0.0.12",
+          "status": "inconclusive",
+          "exit_code": 2,
+          "complete": false,
+          "baseline": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "inconclusive",
+            "exit_code": 2,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "unknown"
+            },
+            "units": [
+              {
+                "name": "cockpit.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/cockpit.socket",
+                  "drop_ins": [],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "9090",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ],
+                "resets": [],
+                "comparable_listeners": [
+                  {
+                    "unit": "cockpit.socket",
+                    "endpoint": "[::]:9090",
+                    "address": "::",
+                    "port": 9090,
+                    "family": "ipv6",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "9090",
+                      "source": {
+                        "path": "usr/lib/systemd/system/cockpit.socket",
+                        "line": 7,
+                        "end_line": 7
+                      }
+                    },
+                    "ipv6_mode": "unknown"
+                  }
+                ],
+                "issues": [
+                  {
+                    "severity": "uncovered",
+                    "code": "unknown_bindv6only",
+                    "message": "IPv4 overlap depends on the target net.ipv6.bindv6only. Supply --bindv6only 0 or 1.",
+                    "source": {
+                      "path": "usr/lib/systemd/system/cockpit.socket",
+                      "line": 7,
+                      "end_line": 7
+                    }
+                  }
+                ]
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "candidate": {
+            "schema_version": 1,
+            "version": "0.0.12",
+            "status": "clear",
+            "exit_code": 0,
+            "environment": {
+              "ipv6": "enabled",
+              "bindv6only": "unknown"
+            },
+            "units": [
+              {
+                "name": "ssh.socket",
+                "plan": {
+                  "fragment": "usr/lib/systemd/system/ssh.socket",
+                  "drop_ins": [
+                    "etc/systemd/system/ssh.socket.d/20-move-port.conf"
+                  ],
+                  "shadowed": []
+                },
+                "active_listen": [
+                  {
+                    "key": "ListenStream",
+                    "value": "127.0.0.1:9090",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 3,
+                      "end_line": 3
+                    }
+                  }
+                ],
+                "resets": [
+                  {
+                    "key": "ListenStream",
+                    "source": {
+                      "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                      "line": 2,
+                      "end_line": 2
+                    },
+                    "cleared": [
+                      {
+                        "key": "ListenStream",
+                        "value": "22",
+                        "source": {
+                          "path": "usr/lib/systemd/system/ssh.socket",
+                          "line": 7,
+                          "end_line": 7
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "comparable_listeners": [
+                  {
+                    "unit": "ssh.socket",
+                    "endpoint": "127.0.0.1:9090",
+                    "address": "127.0.0.1",
+                    "port": 9090,
+                    "family": "ipv4",
+                    "setting": {
+                      "key": "ListenStream",
+                      "value": "127.0.0.1:9090",
+                      "source": {
+                        "path": "etc/systemd/system/ssh.socket.d/20-move-port.conf",
+                        "line": 3,
+                        "end_line": 3
+                      }
+                    }
+                  }
+                ],
+                "issues": []
+              }
+            ],
+            "conflicts": [],
+            "conflict_count": 0,
+            "conflicts_omitted": 0,
+            "issues": []
+          },
+          "issues": [],
+          "new_conflicts": [],
+          "existing_conflicts": [],
+          "resolved_conflicts": [],
+          "uncertain_new": [],
+          "uncertain_resolved": []
+        },
+        "issues": []
+      }
+    },
+    "escape_member": {
+      "schema_version": 1,
+      "bundle_sha256": "d02215968d4925b11ae69b49819abe0d932992f6ba8b212a21a52923e6e5e466",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "Non-portable ZIP path: '../escaped'"
+    },
+    "case_fold_directory": {
+      "schema_version": 1,
+      "bundle_sha256": "f89845713c3643081fdac0f1bc3c57484e3afeec0c9a44d665676cf836c09b31",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "Case or type collision in ZIP: 'Before'"
+    },
+    "duplicate": {
+      "schema_version": 1,
+      "bundle_sha256": "d5a751e78f38ef9fe75138bcc64215ed534b42e999b8f26ca44c8ebcb401d054",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "Duplicate ZIP entry: 'plan.json'"
+    },
+    "type_collision": {
+      "schema_version": 1,
+      "bundle_sha256": "495513cd43fbe524670acd53716410ceb03e8f75a10576f579db5e72c5fa29df",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "Case or type collision in ZIP: 'before'"
+    },
+    "device_name": {
+      "schema_version": 1,
+      "bundle_sha256": "c734c9e6d8f75eb30946a81d4820efe20070aede461bfb9400ecff000f92ab4b",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "Non-portable ZIP path: 'notes/CON.txt'"
+    },
+    "absolute_plan_root": {
+      "schema_version": 1,
+      "bundle_sha256": "ac100eefdf95d7c662c7defe7276a4959fa8a829018c52eb09105f1baf568652",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "candidate root must stay inside the ZIP"
+    },
+    "parent_plan_root": {
+      "schema_version": 1,
+      "bundle_sha256": "03adbd968327bd885875e89437b73333b4fab48d82883fc7ed85141f107d1ac1",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "candidate root must stay inside the ZIP"
+    },
+    "link_member": {
+      "schema_version": 1,
+      "bundle_sha256": "2a674c7c456517517caf47181dd00dc19f0613ee68e0a94faee245510e05cc52",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "Unsupported ZIP entry: 'notices/linked'"
+    },
+    "corrupt": {
+      "schema_version": 1,
+      "bundle_sha256": "cb5ab9731945e9a1ea1c09019e382c1ac2688f7ee4706040f387b7bb9ad73fc4",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "File is not a zip file"
+    },
+    "broken_member": {
+      "schema_version": 1,
+      "bundle_sha256": "645605913e8a431b82f42eea35a0af78b0fdc1c1cebf7b7af2305d7faed0b07e",
+      "cli_sha256": "4690a834990ecc62ba470795591f2f46477d0756743b6ac5ef19dab4bf2152e2",
+      "exit_code": 3,
+      "rollout": null,
+      "error": "Error -3 while decompressing data: invalid block type"
+    },
+    "unwritable_receipt": {
+      "exit_code": 3,
+      "stderr": "Cannot write gate receipt: [Errno 2] No such file or directory: 'C:\\\\Users\\\\\ufffd\u03ba\ufffd\u023b\\\\AppData\\\\Local\\\\Temp\\\\socket gate test rce3h3mv\\\\missing\\\\tmpfr6jknbj'"
+    }
+  }
+}
