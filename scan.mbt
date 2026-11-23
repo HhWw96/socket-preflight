@@ -292,6 +292,52 @@ pub fn analyze(inputs : Array[UnitInput], env : Environment) -> Report {
 }
 
 ///|
+priv struct PortBindings {
+  sequence : Array[Listener]
+  exact : Map[String, Array[Listener]]
+  mut has_wildcard : Bool
+}
+
+///|
+fn record_port_conflicts(
+  bindings : PortBindings,
+  listener : Listener,
+  conflicts : Array[Conflict],
+) -> Int {
+  let mut count = 0
+  if listener.address == "0.0.0.0" || listener.address == "::" {
+    bindings.has_wildcard = true
+  }
+  if bindings.has_wildcard {
+    for first in bindings.sequence {
+      if conflict_kind(first, listener) is Some(code) {
+        count += 1
+        if conflicts.length() < max_reported_conflicts {
+          conflicts.push({ code, port: listener.port, first, second: listener, })
+        }
+      }
+    }
+  } else {
+    // Without wildcard coverage, only equal concrete addresses can overlap.
+    // Native and IPv4-mapped listeners share the effective IPv4 bucket.
+    let address = effective_ipv4(listener).unwrap_or(listener.address)
+    let prior = bindings.exact.get(address).unwrap_or([])
+    count = prior.length()
+    let remaining = max_reported_conflicts - conflicts.length()
+    let keep = if count < remaining { count } else { remaining }
+    for first in prior[:keep] {
+      if conflict_kind(first, listener) is Some(code) {
+        conflicts.push({ code, port: listener.port, first, second: listener, })
+      }
+    }
+    prior.push(listener)
+    bindings.exact[address] = prior
+  }
+  bindings.sequence.push(listener)
+  count
+}
+
+///|
 fn analyze_group(inputs : Array[UnitInput], env : Environment) -> Report {
   if inputs.length() > max_units {
     return command_error(
@@ -323,33 +369,20 @@ fn analyze_group(inputs : Array[UnitInput], env : Environment) -> Report {
       ),
     ])
   }
-  let by_port : Map[Int32, Array[Listener]] = Map([])
+  let by_port : Map[Int32, PortBindings] = Map([])
   let conflicts : Array[Conflict] = []
   let mut count = 0
   for unit in units {
     for listener in unit.comparable_listeners {
-      let prior = match by_port.get(listener.port) {
-        Some(prior) => prior
+      let bindings = match by_port.get(listener.port) {
+        Some(bindings) => bindings
         None => {
-          let prior = []
-          by_port[listener.port] = prior
-          prior
+          let bindings : PortBindings = { sequence: [], exact: Map([]), has_wildcard: false }
+          by_port[listener.port] = bindings
+          bindings
         }
       }
-      for first in prior {
-        if conflict_kind(first, listener) is Some(code) {
-          count += 1
-          if conflicts.length() < max_reported_conflicts {
-            conflicts.push({
-              code,
-              port: listener.port,
-              first,
-              second: listener,
-            })
-          }
-        }
-      }
-      prior.push(listener)
+      count += record_port_conflicts(bindings, listener, conflicts)
     }
   }
   make_report(Some(env), units, conflicts, count, [])

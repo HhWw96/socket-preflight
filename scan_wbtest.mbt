@@ -71,6 +71,42 @@ test "intentional target changes have a separate comparison entry point" {
 }
 
 ///|
+test "indexed counts and capped ordering match all listener pairs" {
+  let inputs = []
+  let addresses = [
+    "127.0.0.1:45391", "[::ffff:127.0.0.1]:45391", "127.0.0.2:45391",
+    "[::1]:45391", "[::]:45391", "0.0.0.0:45391",
+  ]
+  for index in 0..<48 {
+    let address = addresses[index % addresses.length()]
+    // Every unit also contributes to a different port with concrete addresses.
+    inputs.push(test_unit("u\{index}.socket", [
+      "[Socket]\nBindIPv6Only=both\nListenStream=\{address}\nListenStream=127.0.0.1:45392",
+    ]))
+  }
+  let report = analyze(inputs, { ipv6: "enabled", bindv6only: "unknown", })
+  let seen : Array[Listener] = []
+  let expected : Array[Conflict] = []
+  for unit in report.units {
+    for second in unit.comparable_listeners {
+      for first in seen {
+        if conflict_kind(first, second) is Some(code) {
+          expected.push({ code, port: second.port, first, second, })
+        }
+      }
+      seen.push(second)
+    }
+  }
+  assert_true(expected.length() > max_reported_conflicts)
+  assert_eq(report.conflict_count, expected.length())
+  assert_eq(report.conflicts_omitted, expected.length() - max_reported_conflicts)
+  assert_eq(
+    @json.to_json(report.conflicts).stringify(),
+    @json.to_json(expected[:max_reported_conflicts].to_owned()).stringify(),
+  )
+}
+
+///|
 test "basename precedence is applied before alphabetical ordering" {
   let selected = select_files([
     {

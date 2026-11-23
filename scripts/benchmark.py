@@ -35,7 +35,7 @@ process.on("exit", () => process.stderr.write(JSON.stringify(counts)));
 """
 
 
-def workloads(workspace):
+def workloads(workspace, same_unit_checks):
     pair = ("admin.socket", "public.socket")
     scope = ("--ipv6", "enabled", "--json")
     units = tuple(f"edge-zone-{i:02}.socket" for i in range(64))
@@ -58,7 +58,8 @@ def workloads(workspace):
         "shipped_pair": (["scan", "--root", str(samples), *scope, *pair], 1, 1),
         "inherited_drop_ins_64_units": (["scan", "--root", str(base), *scope, *units], 0, 0),
         "sparse_same_port_512_listeners": (["scan", "--root", str(sparse), *scope, *units], 0, 0),
-        "dense_same_port_512_listeners": (["scan", "--root", str(dense), *scope, *units], 1, 129_024),
+        "dense_same_port_512_listeners": (
+            ["scan", "--root", str(dense), *scope, *units], 1, 130_816 if same_unit_checks else 129_024),
         "compare_two_64_unit_snapshots": (["compare", "--baseline", str(base), "--candidate", str(candidate),
                                           *scope, *units], 1, 1),
     }
@@ -105,12 +106,16 @@ def main():
     if not node:
         raise SystemExit("Node.js 24 is required.")
     entries = (args.baseline.resolve(strict=True), args.candidate.resolve(strict=True))
+    versions = tuple(metadata(node, entry) for entry in entries)
+    semantics = tuple(int(info["version"].rsplit(".", 1)[-1]) >= 14 for info in versions)
+    if semantics[0] != semantics[1]:
+        parser.error("Use two releases with the same single-unit conflict semantics (both before v0.0.14 or both since it).")
     rows = {}
     with tempfile.TemporaryDirectory(prefix="socket-preflight-benchmark-") as temporary:
         workspace = Path(temporary)
         hook = workspace / "profile.cjs"
         hook.write_text(PROFILE, encoding="utf-8")
-        for name, (argv, code, conflicts) in workloads(workspace).items():
+        for name, (argv, code, conflicts) in workloads(workspace, semantics[0]).items():
             commands = [[node, entry, *argv] for entry in entries]
             _, expected, _ = invoke(commands[0], code, conflicts)
             times = ([], [])
@@ -133,7 +138,7 @@ def main():
                           "median_change_percent": round(100 * (after["median_ms"] / before["median_ms"] - 1), 1)}
             print(f"{name}: {before['median_ms']:.1f} ms -> {after['median_ms']:.1f} ms", flush=True)
     proof = {"host": platform.platform(), "node": subprocess.check_output([node, "--version"], text=True).strip(),
-             "baseline": metadata(node, entries[0]), "candidate": metadata(node, entries[1]),
+             "baseline": versions[0], "candidate": versions[1],
              "runs_per_version_per_case": args.runs, "warmups_per_version_per_case": 2,
              "measurement": "Warm-cache CLI wall time including Node startup and JSON output capture. FS call counts from separate runs.",
              "workloads": rows}
