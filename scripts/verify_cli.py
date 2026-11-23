@@ -142,6 +142,37 @@ def main():
         assert fragments["units"][1]["plan"]["fragment"] == ADMIN + "public.socket"
         assert len(fragments["units"][1]["plan"]["shadowed"]) == 2
 
+        if patch >= 15:
+            local = "usr/local/lib/systemd/system/"
+            tree = snapshot("local-socket-inventory")
+            put(tree, local + "public.socket", "[Socket]\nListenStream=127.0.0.1:45392\n")
+            view = scan("local-prefix-fragment-precedes-vendor", tree, 0)
+            assert view["units"][1]["plan"]["fragment"] == local + "public.socket"
+            put(tree, local + "admin.socket.d/30-local.conf",
+                "[Socket]\nListenStream=127.0.0.1:45392\n")
+            view = scan("local-prefix-drop-in-participates-in-collision", tree, 1, conflicts=1)
+            assert view["conflicts"][0]["first"]["setting"]["source"]["path"] == (
+                local + "admin.socket.d/30-local.conf")
+            put(tree, "run/systemd/generator/other.socket", PAYLOAD)
+            put(tree, VENDOR + "clone@.socket", PAYLOAD)
+            proc = cli(["inventory", "--root", str(tree), "--json"])
+            listing = json.loads(proc.stdout)
+            assert (proc.returncode, listing["status"]) == (0, "ok")
+            by_name = {unit["name"]: unit for unit in listing["candidates"]}
+            assert set(by_name) == {"admin.socket", "clone@.socket", "other.socket", "public.socket"}
+            assert not by_name["clone@.socket"]["literal_name"]
+            assert not by_name["other.socket"]["fragments"][0]["modeled_path"]
+            assert [row["path"] for row in by_name["public.socket"]["fragments"]] == [
+                local + "public.socket", VENDOR + "public.socket"]
+            results.append({"case": "inventory-models-locations-without-assuming-activation", "status": "ok"})
+            put(tree, "run/systemd/system", "not a directory")
+            partial = cli(["inventory", "--root", str(tree), "--json"])
+            report = json.loads(partial.stdout)
+            assert (partial.returncode, report["status"]) == (2, "partial")
+            assert report["issues"][0]["source"]["path"] == "run/systemd/system"
+            assert report["candidates"] == listing["candidates"]
+            results.append({"case": "inventory-preserves-results-when-directory-unavailable", "status": "partial"})
+
         v6 = snapshot("kernel-default", second="[Socket]\nListenStream=[::]:45391\nBindIPv6Only=default\n")
         scan("unknown-kernel-default", v6, 2, "--ipv6", "enabled", issue="unknown_bindv6only")
         scan("kernel-default-dual", v6, 1, "--ipv6", "enabled", "--bindv6only", "0", conflicts=1)

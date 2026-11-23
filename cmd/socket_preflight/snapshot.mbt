@@ -53,20 +53,23 @@ extern "js" fn probe(
   #|       if (needsDirectory && kind !== "directory") return ["not_directory"];
   #|     }
   #|     if (operation === "kind") return [kind];
-  #|     if (operation === "list" && kind === "directory") {
+  #|     if ((operation === "list" || operation === "inventory") && kind === "directory") {
+  #|       const inventory = operation === "inventory";
+  #|       const suffix = inventory ? ".socket" : ".conf";
+  #|       const limit = inventory ? 512 : 128;
   #|       const dir = fs.opendirSync(current);
   #|       try {
   #|         const names = [];
   #|         let total = 0;
   #|         for (let item; (item = dir.readSync()) !== null;) {
   #|           if (++total > 4096) return ["too_many_entries"];
-  #|           if (item.name.startsWith(".") || !item.name.endsWith(".conf")) continue;
-  #|           if (names.length === 128) return ["too_many_drop_ins"];
+  #|           if (item.name.startsWith(".") || !item.name.endsWith(suffix)) continue;
+  #|           if (names.length === limit) return [inventory ? "too_many_units" : "too_many_drop_ins"];
   #|           names.push(item.name);
   #|         }
   #|         names.sort();
   #|         const result = ["listed", ...names];
-  #|         if (snapshot.listBudget >= result.length) {
+  #|         if (!inventory && snapshot.listBudget >= result.length) {
   #|           snapshot.listBudget -= result.length;
   #|           lists.set(relative, result);
   #|         }
@@ -102,14 +105,15 @@ extern "js" fn probe(
 
 ///|
 let supported_roots : Array[String] = [
-  "etc/systemd/system", "run/systemd/system", "usr/lib/systemd/system",
+  "etc/systemd/system", "run/systemd/system", "usr/local/lib/systemd/system",
+  "usr/lib/systemd/system",
 ]
 
 ///|
 let other_roots : Array[String] = [
   "etc/systemd/system.control", "run/systemd/system.control", "run/systemd/transient",
   "run/systemd/generator.early", "etc/systemd/system.attached", "run/systemd/system.attached",
-  "run/systemd/generator", "usr/local/lib/systemd/system", "lib/systemd/system",
+  "run/systemd/generator", "lib/systemd/system",
   "run/systemd/generator.late",
 ]
 

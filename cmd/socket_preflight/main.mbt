@@ -19,6 +19,7 @@ priv enum Snapshots {
 ///|
 let usage : String =
   #| SocketPreflight
+  #|   socket-preflight inventory --root <snapshot-dir> [--json]
   #|   socket-preflight scan --root <snapshot-dir> [--ipv6 enabled|disabled|unknown]
   #|       [--bindv6only 0|1|unknown] [--json] <first.socket> [...]
   #|   socket-preflight compare --baseline <snapshot-dir> --candidate <snapshot-dir>
@@ -257,6 +258,7 @@ fn main {
   if args.is_empty() ||
     args == ["--help"] ||
     args == ["-h"] ||
+    args == ["inventory", "--help"] ||
     args == ["scan", "--help"] ||
     args == ["compare", "--help"] ||
     args == ["rollout", "--help"] {
@@ -269,6 +271,10 @@ fn main {
   }
   if args[0] == "rollout" {
     run_rollout(args[1:])
+    return
+  }
+  if args[0] == "inventory" {
+    run_inventory(args[1:])
     return
   }
   match parse_options(args) {
