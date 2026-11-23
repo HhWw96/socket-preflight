@@ -6,7 +6,7 @@ on:
       case:
         description: Debian deployment example
         type: choice
-        options: [bad, fixed]
+        options: [bad, fixed, inconclusive, bad-checksum, substituted]
         required: true
       release_tag:
         description: Tag of the published SocketPreflight ZIP
@@ -33,6 +33,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import hashlib
+          import json
           import os
           from pathlib import Path
           import re
@@ -43,7 +44,7 @@ jobs:
           expected_hash = os.environ["RELEASE_SHA256"].lower()
           case = os.environ["SELECTED_CASE"]
           if (not re.fullmatch(r"v0\.0\.\d+", tag) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash)
-                  or case not in {"bad", "fixed"}):
+                  or case not in {"bad", "fixed", "inconclusive", "bad-checksum", "substituted"}):
               raise SystemExit("Invalid release tag, checksum or case")
           stem = f"socket-preflight-{tag}"
           destination = Path(os.environ["RUNNER_TEMP"])
@@ -58,8 +59,20 @@ jobs:
               for member, name in ((stem + ".cjs", "socket-preflight.cjs"),
                                    ("gate_bundle.py", "gate_bundle.py"),
                                    ("deployment_pipeline.py", "deployment_pipeline.py"),
-                                   (f"samples/debian-{case}.zip", "deployment.zip")):
+                                   (f"samples/debian-{'fixed' if case in {'fixed', 'bad-checksum', 'substituted'} else 'bad'}.zip", "deployment.zip")):
                   (handoff / name).write_bytes(bundle.read(member))
+              if case == "substituted":
+                  (handoff / "substitute.zip").write_bytes(bundle.read("samples/debian-bad.zip"))
+          if case == "inconclusive":
+              deployment = handoff / "deployment.zip"
+              with zipfile.ZipFile(deployment) as source:
+                  files = {name: source.read(name) for name in source.namelist()}
+              plan = json.loads(files["plan.json"])
+              plan["environment"]["ipv6"] = "unknown"
+              files["plan.json"] = json.dumps(plan).encode()
+              with zipfile.ZipFile(deployment, "w", compression=zipfile.ZIP_DEFLATED) as output:
+                  for name, data in files.items():
+                      output.writestr(name, data)
           PY
       - uses: actions/upload-artifact@v6
         with:
@@ -69,23 +82,12 @@ jobs:
 
   gate:
     needs: prepare
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: deployment-inputs
-          path: incoming/
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.13.0'
-      - name: Gate the exact ZIP
-        run: python3 incoming/gate_bundle.py --bundle incoming/deployment.zip --cli incoming/socket-preflight.cjs --report receipt.json
-      - uses: actions/upload-artifact@v6
-        if: ${{ always() }}
-        with:
-          name: gate-receipt
-          path: receipt.json
-          if-no-files-found: error
+    uses: ./.github/workflows/preflight.yml
+    with:
+      deployment_artifact: deployment-inputs
+      release_tag: ${{ inputs.release_tag }}
+      release_sha256: ${{ inputs.case == 'bad-checksum' && '0000000000000000000000000000000000000000000000000000000000000000' || inputs.release_sha256 }}
+      receipt_artifact: gate-receipt
 
   release-rehearsal:
     needs: gate
@@ -100,7 +102,12 @@ jobs:
           name: gate-receipt
           path: reports/
       - name: Check identity of the approved ZIP and CLI
-        run: python3 incoming/deployment_pipeline.py release --bundle incoming/deployment.zip --cli incoming/socket-preflight.cjs --receipt reports/receipt.json --marker would-deploy.json
+        env:
+          SELECTED_CASE: ${{ inputs.case }}
+        run: |
+          bundle=incoming/deployment.zip
+          if [ "$SELECTED_CASE" = substituted ]; then bundle=incoming/substitute.zip; fi
+          python3 incoming/deployment_pipeline.py release --bundle "$bundle" --cli incoming/socket-preflight.cjs --receipt reports/receipt.json --marker would-deploy.json
       - uses: actions/upload-artifact@v6
         with:
           name: would-deploy

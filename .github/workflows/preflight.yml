@@ -1,0 +1,71 @@
+name: SocketPreflight deployment gate
+
+on:
+  workflow_call:
+    inputs:
+      deployment_artifact:
+        required: true
+        type: string
+      release_tag:
+        required: true
+        type: string
+      release_sha256:
+        required: true
+        type: string
+      receipt_artifact:
+        type: string
+        default: socketpreflight-receipt
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.deployment_artifact }}
+          path: incoming/
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.13.0'
+      - name: Verify the public tool release
+        env:
+          TOOL_TAG: ${{ inputs.release_tag }}
+          TOOL_SHA256: ${{ inputs.release_sha256 }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from io import BytesIO
+          import os
+          from pathlib import Path
+          import re
+          from urllib.request import urlopen
+          from zipfile import ZipFile
+
+          tag = os.environ["TOOL_TAG"]
+          digest = os.environ["TOOL_SHA256"].lower()
+          if not re.fullmatch(r"v0\.0\.\d+", tag) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+              raise SystemExit("Invalid release tag or SHA-256")
+          if not Path("incoming/deployment.zip").is_file():
+              raise SystemExit("The input artifact must contain deployment.zip at its root")
+          stem = f"socket-preflight-{tag}"
+          url = f"https://github.com/HhWw96/socket-preflight/releases/download/{tag}/{stem}.zip"
+          with urlopen(url, timeout=45) as response:
+              data = response.read(32 * 1024 * 1024 + 1)
+          if len(data) > 32 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != digest:
+              raise SystemExit("Published release ZIP has a different SHA-256 or exceeds the size limit")
+          with ZipFile(BytesIO(data)) as release:
+              Path("gate_bundle.py").write_bytes(release.read("gate_bundle.py"))
+              Path("socket-preflight.cjs").write_bytes(release.read(f"{stem}.cjs"))
+          PY
+      - name: Evaluate deployment ZIP
+        id: preflight
+        run: python3 gate_bundle.py --bundle incoming/deployment.zip --cli socket-preflight.cjs --report receipt.json
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() && steps.preflight.outcome != 'skipped' && steps.preflight.outcome != '' }}
+        with:
+          name: ${{ inputs.receipt_artifact }}
+          path: receipt.json
+          if-no-files-found: error
