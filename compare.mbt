@@ -87,11 +87,11 @@ fn compatible_scopes(
   baseline : Report,
   candidate : Report,
   allow_group_changes : Bool,
+  allow_environment_changes : Bool,
 ) -> Bool {
   match (baseline.environment, candidate.environment) {
     (Some(a), Some(b)) =>
-      a.ipv6 == b.ipv6 &&
-      a.bindv6only == b.bindv6only &&
+      (allow_environment_changes || (a.ipv6 == b.ipv6 && a.bindv6only == b.bindv6only)) &&
       (
         allow_group_changes ||
         baseline.units.map(u => u.name) == candidate.units.map(u => u.name)
@@ -105,6 +105,13 @@ fn compatible_scopes(
 /// An absent finding is evidence only if both involved units were covered.
 pub fn compare_reports(baseline : Report, candidate : Report) -> Comparison {
   compare_groups(baseline, candidate, false)
+}
+
+///|
+/// Compare the same socket units across an explicitly planned target environment
+/// change. Uncovered bindings still prevent confirming absence.
+pub fn compare_target_reports(baseline : Report, candidate : Report) -> Comparison {
+  compare_groups(baseline, candidate, false, allow_environment_changes=true)
 }
 
 ///|
@@ -132,12 +139,15 @@ fn compare_groups(
   baseline : Report,
   candidate : Report,
   allow_group_changes : Bool,
+  allow_environment_changes~ : Bool = false,
 ) -> Comparison {
   let before = conflict_index(baseline)
   let after = conflict_index(candidate)
   let before_covered = covered_units(baseline)
   let after_covered = covered_units(candidate)
-  let compatible = compatible_scopes(baseline, candidate, allow_group_changes)
+  let compatible = compatible_scopes(
+    baseline, candidate, allow_group_changes, allow_environment_changes,
+  )
   let new_conflicts : Array[Conflict] = []
   let existing_conflicts : Array[Conflict] = []
   let resolved_conflicts : Array[Conflict] = []
@@ -175,7 +185,11 @@ fn compare_groups(
     [
       input_issue(
         "different_scopes",
-        "Use the same unit names and target environment for both scans.",
+        if allow_environment_changes {
+          "Use the same unit names and an explicit environment for each scan."
+        } else {
+          "Use the same unit names and target environment for both scans."
+        },
         None,
       ),
     ]

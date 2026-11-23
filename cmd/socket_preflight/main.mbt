@@ -7,6 +7,7 @@ priv struct Options {
   snapshots : Snapshots
   units : Array[String]
   environment : @preflight.Environment
+  candidate_environment : @preflight.Environment?
   output : String
 }
 
@@ -23,7 +24,8 @@ let usage : String =
   #|   socket-preflight scan --root <snapshot-dir> [--ipv6 enabled|disabled|unknown]
   #|       [--bindv6only 0|1|unknown] [--json|--sarif] <first.socket> [...]
   #|   socket-preflight compare --baseline <snapshot-dir> --candidate <snapshot-dir>
-  #|       [same environment flags] [--json|--sarif] <first.socket> [...]
+  #|       [same environment flags] [--candidate-ipv6 <mode>] [--candidate-bindv6only <value>]
+  #|       [--json|--sarif] <first.socket> [...]
   #|   socket-preflight rollout --plan <plan.json> [--json]
   #|   socket-preflight --version
   #| 
@@ -48,7 +50,8 @@ fn parse_options(args : ArrayView[String]) -> Result[Options, String] {
     at += 1
     match text {
       "--json" | "--sarif" if output == "text" => output = text
-      "--root" | "--baseline" | "--candidate" | "--ipv6" | "--bindv6only" => {
+      "--root" | "--baseline" | "--candidate" | "--ipv6" | "--bindv6only"
+      | "--candidate-ipv6" | "--candidate-bindv6only" => {
         if at == args.length() ||
           args[at].is_empty() ||
           args[at].has_prefix("--") ||
@@ -95,7 +98,23 @@ fn parse_options(args : ArrayView[String]) -> Result[Options, String] {
   if bindv6only != "0" && bindv6only != "1" && bindv6only != "unknown" {
     return Err("--bindv6only accepts 0, 1, or unknown.")
   }
-  Ok({ snapshots, units, environment: { ipv6, bindv6only, }, output, })
+  let candidate_environment = match
+    (options.get("--candidate-ipv6"), options.get("--candidate-bindv6only")) {
+    (None, None) => None
+    _ if !comparing => return Err("Candidate environment flags are only for compare.")
+    (candidate_ipv6, candidate_bindv6only) => {
+      let ipv6 = candidate_ipv6.unwrap_or(ipv6)
+      let bindv6only = candidate_bindv6only.unwrap_or(bindv6only)
+      if ipv6 != "enabled" && ipv6 != "disabled" && ipv6 != "unknown" {
+        return Err("--candidate-ipv6 accepts enabled, disabled, or unknown.")
+      }
+      if bindv6only != "0" && bindv6only != "1" && bindv6only != "unknown" {
+        return Err("--candidate-bindv6only accepts 0, 1, or unknown.")
+      }
+      Some(@preflight.Environment::{ ipv6, bindv6only, })
+    }
+  }
+  Ok({ snapshots, units, environment: { ipv6, bindv6only, }, candidate_environment, output, })
 }
 
 ///|
@@ -289,7 +308,7 @@ fn main {
       }
     }
     Ok(options) => {
-      let { snapshots, units, environment, output, } = options
+      let { snapshots, units, environment, candidate_environment, output, } = options
       match snapshots {
         Single(root) => {
           let report = scan_snapshot(root, units, environment)
@@ -300,10 +319,15 @@ fn main {
           }
         }
         BaselineCandidate(baseline, candidate) => {
-          let report = @preflight.compare_reports(
-            scan_snapshot(baseline, units, environment),
-            scan_snapshot(candidate, units, environment),
+          let before = scan_snapshot(baseline, units, environment)
+          let after = scan_snapshot(
+            candidate, units, candidate_environment.unwrap_or(environment),
           )
+          let report = if candidate_environment is Some(_) {
+            @preflight.compare_target_reports(before, after)
+          } else {
+            @preflight.compare_reports(before, after)
+          }
           if output == "--sarif" {
             emit_comparison_sarif(report, baseline, candidate)
           } else {

@@ -59,6 +59,18 @@ test "same-unit overlap reports both effective sources" {
 }
 
 ///|
+test "intentional target changes have a separate comparison entry point" {
+  let v4 = ["[Socket]\nListenStream=127.0.0.1:45391"]
+  let v6 = ["[Socket]\nListenStream=[::]:45391"]
+  let before = compare_config(v4, v6, bindv6only="1")
+  let after = compare_config(v4, v6, bindv6only="0")
+  assert_eq(compare_reports(before, after).exit_code, 3)
+  let changed = compare_target_reports(before, after)
+  assert_eq(changed.exit_code, 1)
+  assert_eq(changed.new_conflicts[0].code, "dual_stack_overlap")
+}
+
+///|
 test "basename precedence is applied before alphabetical ordering" {
   let selected = select_files([
     {

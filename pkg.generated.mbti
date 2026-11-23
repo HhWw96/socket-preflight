@@ -18,6 +18,8 @@ pub fn command_error(String) -> Report
 
 pub fn compare_reports(Report, Report) -> Comparison
 
+pub fn compare_target_reports(Report, Report) -> Comparison
+
 pub fn comparison_error(String) -> Comparison
 
 pub fn file_source(String) -> Source

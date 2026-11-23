@@ -438,6 +438,31 @@ def main():
                              units=dense_units, counts=(0, 256, 0, 0, 0), complete=False)
             assert result["baseline"]["conflicts_omitted"] == 20
 
+            if patch >= 20:
+                def compare_target(before, after, expected, *overrides):
+                    proc = cli(["compare", "--baseline", str(v6), "--candidate", str(v6),
+                                "--ipv6", "enabled", "--bindv6only", before, "--json",
+                                "--candidate-bindv6only", after, *overrides,
+                                "admin.socket", "public.socket"])
+                    report = json.loads(proc.stdout)
+                    assert proc.returncode == report["exit_code"] == expected
+                    assert report["baseline"]["environment"]["bindv6only"] == before
+                    assert report["candidate"]["environment"]["bindv6only"] == after
+                    return report
+
+                new = compare_target("1", "0", 1)
+                assert new["new_conflicts"][0]["code"] == "dual_stack_overlap"
+                results.append({"case": "target-kernel-change-can-create-conflict", "status": "regression"})
+                gone = compare_target("0", "1", 0)
+                assert gone["resolved_conflicts"][0]["code"] == "dual_stack_overlap"
+                results.append({"case": "target-kernel-change-can-resolve-conflict", "status": "clear"})
+                unknown = compare_target("0", "unknown", 2, "--candidate-ipv6", "unknown")
+                assert len(unknown["uncertain_resolved"]) == 1 and not unknown["complete"]
+                assert unknown["candidate"]["environment"]["ipv6"] == "unknown"
+                results.append({"case": "target-kernel-unknown-remains-inconclusive", "status": "inconclusive"})
+                scan("candidate-knobs-only-apply-to-compare", v6, 3,
+                     "--candidate-bindv6only", "0", issue="invalid_command")
+
             result = compare("invalid-candidate-root", fixed_root, workspace / "missing-root", 3, complete=False)
             assert result["candidate"]["issues"][0]["code"] == "invalid_command"
             wrong_args = cli(["compare", "--root", str(fixed_root), "--json", "admin.socket", "public.socket"])
