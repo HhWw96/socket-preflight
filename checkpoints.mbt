@@ -107,8 +107,42 @@ fn analyze_checkpoints(
 }
 
 ///|
+fn pending_rebind_units(
+  previous : StageInput,
+  current : StageInput,
+  pending : Array[String],
+) -> Array[String] {
+  if current.rebind_all {
+    return []
+  }
+  let changed = previous.environment.ipv6 != current.environment.ipv6 ||
+    previous.environment.bindv6only != current.environment.bindv6only
+  let retained : Array[String] = []
+  for unit in current.units {
+    if pending.contains(unit.name) ||
+      (changed && previous.units.any(old => old.name == unit.name)) {
+      retained.push(unit.name)
+    }
+  }
+  retained.sort_by(compare_ascii_paths)
+  retained
+}
+
+///|
+fn append_stage_input_issues(report : Report, stage : String, issues : Array[Issue]) -> Unit {
+  let append = fn(issue : Issue) {
+    if issue.severity == "input_error" {
+      issues.push({ ..issue, message: "\{stage}: \{issue.message}", })
+    }
+  }
+  report.issues.each(append)
+  report.units.each(unit => unit.issues.each(append))
+}
+
+///|
 /// Compare against the baseline, guarding environment changes between adjacent
 /// stages when a unit may keep sockets created under the old environment.
+/// Other stages keep their comparison results while binding coverage is incomplete.
 pub fn analyze_staged_rollout(
   baseline : StageInput,
   checkpoints : Array[StagedCheckpoint],
@@ -131,48 +165,56 @@ pub fn analyze_staged_rollout(
     stages.any(checkpoint => !valid_environment(checkpoint.stage.environment)) {
     return checkpoint_rollout_error("Invalid target IPv6 environment.")
   }
+  let before = analyze_group(baseline.units, baseline.environment)
   let mut previous = baseline
-  let issues = []
+  let mut pending : Array[String] = []
+  let mut invalid_input = before.exit_code == 3
+  let comparisons : Array[CheckpointResult] = []
+  let mut candidate_result : Comparison? = None
+  let outcomes : Array[Comparison] = []
+  let issues : Array[Issue] = []
+  let mut coverage_missing = false
   for checkpoint in stages {
     let current = checkpoint.stage
-    let previous_env = previous.environment
-    let env = current.environment
-    if (previous_env.ipv6 != env.ipv6 || previous_env.bindv6only != env.bindv6only) &&
-      !current.rebind_all &&
-      current.units.any(unit => previous.units.any(old => old.name == unit.name)) {
+    pending = pending_rebind_units(previous, current, pending)
+    previous = current
+    let scan = analyze_group(current.units, current.environment)
+    if !pending.is_empty() {
+      coverage_missing = true
+      let names = pending.join(", ")
       issues.push(uncovered(
         "unverified_rebind",
-        "\{checkpoint.name}: target environment changed with shared units. Confirm all listeners are recreated with rebind_all.",
+        "\{checkpoint.name}: listener recreation remains unverified for \{names}. Confirm all listeners are recreated with rebind_all.",
         None,
       ))
+      if scan.exit_code == 3 {
+        invalid_input = true
+        append_stage_input_issues(scan, checkpoint.name, issues)
+      }
+      continue
     }
-    previous = current
-  }
-  if !issues.is_empty() {
-    return {
-      schema_version: 2, version, status: "inconclusive", exit_code: 2,
-      complete: false, checkpoints: [], candidate: None, issues,
+    let comparison = compare_groups(before, scan, true, allow_environment_changes=true)
+    outcomes.push(comparison)
+    if checkpoint.name == "candidate" {
+      candidate_result = Some(comparison)
+    } else {
+      comparisons.push({
+        name: checkpoint.name,
+        result: { ..comparison, baseline: None, },
+      })
     }
   }
-  let before = analyze_group(baseline.units, baseline.environment)
-  let candidate = compare_groups(before, analyze_group(candidate.units, candidate.environment),
-                                 true, allow_environment_changes=true)
-  let checkpoints = checkpoints.map(checkpoint => {
-    let comparison = compare_groups(
-      before,
-      analyze_group(checkpoint.stage.units, checkpoint.stage.environment),
-      true,
-      allow_environment_changes=true,
-    )
-    { name: checkpoint.name, result: { ..comparison, baseline: None, }, }
-  })
-  let outcomes = checkpoints.map(checkpoint => checkpoint.result)
-  outcomes.push(candidate)
+  if candidate_result is None && before.exit_code == 3 {
+    append_stage_input_issues(before, "baseline", issues)
+  }
   let (status, exit_code, complete) = rollout_outcome(outcomes)
-  let (status, exit_code) = if require_clear &&
-    exit_code != 3 &&
+  let (status, exit_code) = if invalid_input || exit_code == 3 {
+    ("input_error", 3)
+  } else if require_clear &&
     outcomes.any(result => result.candidate.map_or(false, scan => scan.conflict_count > 0)) {
     ("conflict", 1)
+  } else if exit_code == 0 && coverage_missing {
+    ("inconclusive", 2)
   } else {
     (status, exit_code)
   }
@@ -181,9 +223,9 @@ pub fn analyze_staged_rollout(
     version,
     status,
     exit_code,
-    complete,
-    checkpoints,
-    candidate: Some(candidate),
-    issues: [],
+    complete: complete && !coverage_missing && exit_code != 3,
+    checkpoints: comparisons,
+    candidate: candidate_result,
+    issues,
   }
 }

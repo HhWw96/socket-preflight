@@ -142,6 +142,16 @@ def verify(release, inputs):
             scope["candidate"]["rebind_all"] = True
             conflict = variant("stage-rebind-confirmed-detects-conflict", snapshots, scope, expected=1)
             assert conflict["rollout"]["candidate"]["new_conflicts"][0]["port"] == 45397
+            if int(entry.rsplit(".", 2)[-2]) >= 25:
+                staged = {key: value for key, value in plan.items() if key != "transition"}
+                staged.update(schema_version=2, checkpoints=[{"name": "overlap", **plan["transition"]}],
+                              candidate={**plan["candidate"], "environment": {
+                                  "ipv6": "enabled", "bindv6only": "1"}})
+                mixed = variant("receipt-retains-conflict-with-unverified-candidate",
+                                updated_plan=staged, expected=1)["rollout"]
+                assert not mixed["complete"] and mixed.get("candidate") is None
+                assert mixed["checkpoints"][0]["result"]["new_conflicts"][0]["port"] == 9090
+                assert mixed["issues"][0]["code"] == "unverified_rebind"
 
         variant("unmodelled_environment", updated_plan={
             **plan, "environment": {"ipv6": "enabled", "bindv6only": "unknown"}}, expected=2)

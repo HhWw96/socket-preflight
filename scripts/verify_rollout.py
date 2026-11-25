@@ -49,6 +49,8 @@ def run_cli(node, entry, *args, code):
 
 
 def check_plans(node, entry, example, checks):
+    patch = int(entry.stem.rsplit(".", 1)[-1])
+
     def gate(label, plan, code, schema=1, status=None):
         report = run_cli(node, entry, "rollout", "--plan", str(plan), "--json", code=code)
         assert report["schema_version"] == schema
@@ -151,7 +153,7 @@ def check_plans(node, entry, example, checks):
             plan.write_text(json.dumps(policy_plan), encoding="utf-8")
             gate("strict-policy-spelling-is-validated", plan, 3)
 
-    if int(entry.stem.rsplit(".", 1)[-1]) >= 24:
+    if patch >= 24:
         stage_dir = example / "target-env/usr/lib/systemd/system"
         stage_dir.mkdir(parents=True)
         for name, endpoint in (("v6.socket", "[::]:45397"), ("v4.socket", "127.0.0.1:45397")):
@@ -177,14 +179,65 @@ def check_plans(node, entry, example, checks):
         plan.write_text(json.dumps({"schema_version": 2, "environment": a, "baseline": shared,
             "checkpoints": [{**shared, "name":"flip", "environment":b, "rebind_all":True}],
             "candidate": shared}), encoding="utf-8")
-        check = gate("return-to-default-needs-rebind-too", plan, 2, schema=2)
+        check = gate("return-to-default-needs-rebind-too", plan, 1 if patch >= 25 else 2, schema=2)
         assert "candidate" in check["issues"][0]["message"]
+        if patch >= 25:
+            assert check["checkpoints"][0]["result"]["new_conflicts"][0]["port"] == 45397
         plan.write_text(json.dumps({"schema_version": 2, "environment": a, "baseline": shared,
             "policy": "require-clear",
             "checkpoints": [{**shared, "name":"flip", "environment":b, "rebind_all":True}],
             "candidate": {**shared, "rebind_all": True}}), encoding="utf-8")
         check = gate("strict-stage-environment-change-is-blocked", plan, 1, schema=2, status="conflict")
         assert check["checkpoints"][0]["result"]["new_conflicts"]
+
+    if patch >= 25:
+        staged = json.loads((example / "checkpoints.json").read_text(encoding="utf-8"))
+        changed = {**staged["candidate"], "environment": b}
+
+        def staged_gate(label, code, status=None, **updates):
+            plan.write_text(json.dumps({**staged, **updates}), encoding="utf-8")
+            return gate(label, plan, code, schema=2, status=status)
+
+        result = staged_gate("confirmed-overlap-survives-later-rebind-uncertainty", 1,
+                             candidate=changed)
+        assert not result["complete"] and result.get("candidate") is None
+        assert [stage["name"] for stage in result["checkpoints"]] == ["canary", "coexist"]
+        conflict, = result["checkpoints"][1]["result"]["new_conflicts"]
+        assert [(conflict[side]["unit"], conflict[side]["setting"]["source"]["line"])
+                for side in ("first", "second")] == [("legacy.socket", 3), ("next.socket", 2)]
+        assert result["issues"][0]["message"].startswith("candidate:")
+        human = run_cli(node, entry, "rollout", "--plan", str(plan), code=1)
+        assert "[coexist]" in human and "legacy.socket:3" in human and "next.socket:2" in human
+        strict = staged_gate("strict-conflict-survives-later-rebind-uncertainty", 1,
+                             status="conflict", candidate=changed, policy="require-clear")
+        assert not strict["complete"]
+
+        result = staged_gate("input-error-precedes-conflict-and-unverified-rebind", 3,
+                             candidate={**changed, "root": "before"})
+        assert result["checkpoints"][1]["result"]["new_conflicts"]
+        assert {issue["code"] for issue in result["issues"]} == {"unverified_rebind", "missing_fragment"}
+
+        pending = {**shared, "name": "change", "environment": b}
+        retained = {**pending, "name": "retained"}
+        result = staged_gate("uncertainty-follows-retained-units", 2, baseline=shared,
+                             environment=a, checkpoints=[pending, retained],
+                             candidate={**shared, "environment": b})
+        assert result["checkpoints"] == [] and result.get("candidate") is None
+        assert [issue["message"].split(":", 1)[0] for issue in result["issues"]] == [
+            "change", "retained", "candidate"]
+
+        rebind = {**retained, "environment": a, "rebind_all": True}
+        result = staged_gate("confirmed-recreation-restores-later-coverage", 2, baseline=shared,
+                             environment=a, checkpoints=[pending, rebind], candidate=shared)
+        assert [stage["name"] for stage in result["checkpoints"]] == ["retained"]
+        assert result["checkpoints"][0]["result"]["complete"] and result["candidate"]["complete"]
+        assert not result["complete"] and len(result["issues"]) == 1
+
+        removed = {**pending, "name": "removed", "units": []}
+        result = staged_gate("removed-and-returned-unit-has-fresh-coverage", 2, baseline=shared,
+                             environment=a, checkpoints=[pending, removed], candidate=shared)
+        assert [stage["name"] for stage in result["checkpoints"]] == ["removed"]
+        assert result["candidate"]["complete"] and len(result["issues"]) == 1
 
 
 def verify(archive, receipt):

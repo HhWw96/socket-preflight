@@ -34,6 +34,14 @@ def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def module_version():
+    manifest = (ROOT / "moon.mod").read_text(encoding="utf-8")
+    match = re.search(r'^version = "(0\.0\.\d+)"$', manifest, re.MULTILINE)
+    if not match:
+        raise SystemExit("Expected a 0.0.X version in moon.mod.")
+    return match[1]
+
+
 def main():
     argparser = argparse.ArgumentParser(description=__doc__)
     argparser.add_argument("--moon", help="MoonBit executable path")
@@ -52,11 +60,7 @@ def main():
     run([moon, "test", *flags, "--deny-warn"], env)
     run([moon, "build", *flags, "--release", "cmd/socket_preflight"], env)
 
-    manifest = (ROOT / "moon.mod").read_text(encoding="utf-8")
-    match = re.search(r'^version = "(0\.0\.\d+)"$', manifest, re.MULTILINE)
-    if not match:
-        raise SystemExit("Expected a 0.0.X version in moon.mod.")
-    version = match[1]
+    version = module_version()
     js = ROOT / "_build/js/release/build/cmd/socket_preflight/socket_preflight.js"
     dist = ROOT / "dist"
     name = f"socket-preflight-v{version}"
