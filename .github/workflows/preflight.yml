@@ -59,13 +59,24 @@ jobs:
           with ZipFile(BytesIO(data)) as release:
               Path("gate_bundle.py").write_bytes(release.read("gate_bundle.py"))
               Path("socket-preflight.cjs").write_bytes(release.read(f"{stem}.cjs"))
+              if "summarize_receipt.py" in release.namelist():
+                  Path("summarize_receipt.py").write_bytes(release.read("summarize_receipt.py"))
           PY
       - name: Evaluate deployment ZIP
         id: preflight
         run: python3 gate_bundle.py --bundle incoming/deployment.zip --cli socket-preflight.cjs --report receipt.json
+      - name: Show deployment gate summary
+        if: ${{ always() && (steps.preflight.outcome == 'success' || steps.preflight.outcome == 'failure') }}
+        run: |
+          if [ -f summarize_receipt.py ] && [ -f receipt.json ]; then
+            python3 summarize_receipt.py receipt.json > summary.md
+            cat summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@v6
         if: ${{ always() && steps.preflight.outcome != 'skipped' && steps.preflight.outcome != '' }}
         with:
           name: ${{ inputs.receipt_artifact }}
-          path: receipt.json
+          path: |
+            receipt.json
+            summary.md
           if-no-files-found: error

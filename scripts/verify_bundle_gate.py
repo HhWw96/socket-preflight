@@ -19,6 +19,36 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def verify_summaries(script, receipts):
+    expectations = {
+        "bad": ("Conflicts blocked", "transition", "TCP 9090", "cockpit.socket:7", "20-move-port.conf:3"),
+        "fixed": ("Passed", "Coverage                complete"),
+        "stage-rebind-unverified-blocks": ("Coverage incomplete", "[unverified_rebind]", "candidate:"),
+        "receipt-retains-conflict-with-unverified-candidate": (
+            "Conflicts blocked", "TCP 9090", "Coverage                incomplete", "[unverified_rebind]"),
+        "parent_plan_root": ("Input error", "exit code `3`"),
+    }
+    results = {}
+    for name, expected in expectations.items():
+        receipt = receipts / f"{name}.json"
+        summary = subprocess.check_output([sys.executable, "-X", "utf8", script, receipt],
+                                          encoding="utf-8", timeout=15)
+        assert all(piece in summary for piece in expected), (name, summary)
+        detail = json.loads(receipt.read_text(encoding="utf-8"))
+        assert detail["bundle_sha256"] in summary and detail["cli_sha256"] in summary
+        results[name] = summary
+
+    detail = json.loads((receipts / "bad.json").read_text(encoding="utf-8"))
+    first = detail["rollout"]["transition"]["new_conflicts"][0]["first"]
+    first["setting"]["source"]["path"] = "vendor/<socket>.socket"
+    markup = receipts / "markup-source.json"
+    markup.write_text(json.dumps(detail), encoding="utf-8")
+    rendered = subprocess.check_output([sys.executable, "-X", "utf8", script, markup],
+                                       encoding="utf-8", timeout=15)
+    assert "vendor/&lt;socket&gt;.socket:7" in rendered and "<socket>" not in rendered
+    return results
+
+
 def verify(release, inputs):
     checks = {}
     with tempfile.TemporaryDirectory(prefix="socket gate test ") as work:
@@ -36,6 +66,9 @@ def verify(release, inputs):
             pack = tool / "package_deployment.py"
             if pack.name in archive.namelist():
                 pack.write_bytes(archive.read(pack.name))
+            summary = tool / "summarize_receipt.py"
+            if int(entry.rsplit(".", 2)[-2]) >= 26:
+                summary.write_bytes(archive.read(summary.name))
         cli_hash = sha(cli)
 
         def run(name, bundle, expected):
@@ -185,7 +218,10 @@ def verify(release, inputs):
                                   "--report", missing], capture_output=True, timeout=40)
         assert process.returncode == 3 and not missing.exists()
         checks["unwritable_receipt"] = {"exit_code": 3, "stderr": process.stderr.decode("utf-8", "replace").strip()}
-    return {"host": platform.platform(), "release_sha256": sha(release), "checks": checks}
+        proof = {"host": platform.platform(), "release_sha256": sha(release), "checks": checks}
+        if summary.is_file():
+            proof["summaries"] = verify_summaries(summary, root)
+    return proof
 
 
 def main():

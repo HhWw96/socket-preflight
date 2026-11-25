@@ -1,7 +1,7 @@
 name = "example/socket-rollout-gate"
 
 import {
-  "HhWw96/socket-preflight@0.0.13",
+  "HhWw96/socket-preflight@0.0.26",
 }
 
 preferred_target = "js"
