@@ -1,0 +1,42 @@
+name: Verify SocketPreflight source
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.13.0'
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: hustcer/setup-moonbit@v1.22
+        with:
+          version: '0.10.20+65efd5b93'
+          core-version: '0.10.20+65efd5b93'
+      - run: moon version --all
+      - run: python -X utf8 scripts/verify_source.py
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: source-verification-${{ runner.os }}
+          path: _build/source-validation/*.json
+          if-no-files-found: ignore

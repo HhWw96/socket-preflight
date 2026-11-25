@@ -271,3 +271,25 @@ test "an unsupported separator inside a comment cannot hide assignments" {
     assert_eq(result.units[0].issues[0].source.unwrap().line, Some(2))
   }
 }
+
+///|
+test "a removed socket can return with confirmed bindings after an uncertain stage" {
+  let v6 = test_unit("v6.socket", ["[Socket]\nListenStream=[::]:45391"])
+  let v4 = test_unit("v4.socket", ["[Socket]\nListenStream=127.0.0.1:45391"])
+  let initial = Environment::{ ipv6: "enabled", bindv6only: "1", }
+  let changed = { ..initial, bindv6only: "0", }
+  let mixed = StageInput::{ units: [v6, v4], environment: changed, rebind_all: false, }
+  let report = analyze_staged_rollout(
+    { units: [v6], environment: initial, rebind_all: false, },
+    [
+      { name: "retained", stage: mixed, },
+      { name: "removed", stage: { ..mixed, units: [v4], }, },
+    ],
+    mixed,
+  )
+  assert_eq(report.exit_code, 1)
+  assert_eq(report.complete, false)
+  assert_eq(report.issues.length(), 1)
+  assert_eq(report.checkpoints.map(checkpoint => checkpoint.name), ["removed"])
+  assert_eq(report.candidate.map_or(0, result => result.new_conflicts.length()), 1)
+}
