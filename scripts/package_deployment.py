@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a deterministic deployment ZIP from a prepared snapshot directory."""
+"""Build a deterministic deployment ZIP from a directory or a rollout plan."""
 
 import argparse
 from itertools import islice
@@ -10,7 +10,8 @@ import sys
 import tempfile
 import zipfile
 
-from gate_bundle import MAX_ENTRIES, MAX_EXPANDED, index_bundle, read_bounded, safe_parts, sha, validate_plan_roots
+from gate_bundle import (MAX_ENTRIES, MAX_EXPANDED, MAX_PLAN_BYTES, index_bundle,
+                         plan_stage_roots, read_bounded, safe_parts, sha, validate_plan_roots)
 
 
 def checked_stat(path):
@@ -49,28 +50,31 @@ def read_snapshot_file(path, expected):
     return data
 
 
-def create_bundle(source, output):
-    if not stat.S_ISDIR(checked_stat(source).st_mode):
-        raise ValueError("Input must be a directory containing plan.json")
-    source = source.resolve(strict=True)
-    output = output.parent.resolve(strict=True) / output.name
-    if output.is_relative_to(source):
-        raise ValueError("Keep the output ZIP outside the input directory")
+def write_member(archive, name, is_directory, data):
+    entry = zipfile.ZipInfo(name + "/" if is_directory else name)
+    entry.create_system = 3
+    entry.external_attr = (0o40755 << 16) | 0x10 if is_directory else 0o100644 << 16
+    archive.writestr(entry, data, compress_type=zipfile.ZIP_DEFLATED)
+
+
+def write_bundle(entries, output, plan_data=None):
     with tempfile.NamedTemporaryFile(dir=output.parent, suffix=".zip", delete=False) as handle:
         temporary = Path(handle.name)
     try:
         total = 0
+        count = 0
         with zipfile.ZipFile(temporary, "w") as archive:
-            for count, (path, name, info) in enumerate(snapshot_entries(source), 1):
+            if plan_data is not None:
+                write_member(archive, "plan.json", False, plan_data)
+                total, count = len(plan_data), 1
+            for path, name, info in entries:
                 is_directory = stat.S_ISDIR(info.st_mode)
                 total += 0 if is_directory else info.st_size
+                count += 1
                 if count > MAX_ENTRIES or total > MAX_EXPANDED:
                     raise ValueError("Snapshot exceeds the entry or expanded-size limit")
-                entry = zipfile.ZipInfo(name + "/" if is_directory else name)
-                entry.create_system = 3
-                entry.external_attr = (0o40755 << 16) | 0x10 if is_directory else 0o100644 << 16
-                archive.writestr(entry, b"" if is_directory else read_snapshot_file(path, info),
-                                 compress_type=zipfile.ZIP_DEFLATED)
+                member_data = b"" if is_directory else read_snapshot_file(path, info)
+                write_member(archive, name, is_directory, member_data)
         data = read_bounded(temporary)
         with zipfile.ZipFile(temporary) as archive:
             paths, _ = index_bundle(archive)
@@ -82,13 +86,71 @@ def create_bundle(source, output):
         temporary.unlink(missing_ok=True)
 
 
+def create_bundle(source, output):
+    if not stat.S_ISDIR(checked_stat(source).st_mode):
+        raise ValueError("Input must be a directory containing plan.json")
+    source = source.resolve(strict=True)
+    output = output.parent.resolve(strict=True) / output.name
+    if output.is_relative_to(source):
+        raise ValueError("Keep the output ZIP outside the input directory")
+    return write_bundle(snapshot_entries(source), output)
+
+
+def stage_directories(directory, roots):
+    selected = []
+    for relative in sorted({root for _, root in roots}):
+        if relative == ".":
+            raise ValueError("Use --input for a plan with a stage rooted at '.'")
+        if any(relative.startswith(name + "/") for _, name, _ in selected):
+            continue
+        path = directory
+        for part in relative.split("/"):
+            path = path / part
+            info = checked_stat(path)
+            if not stat.S_ISDIR(info.st_mode):
+                raise ValueError(f"Stage root is not a directory: {relative!r}")
+        if path.resolve(strict=True).relative_to(directory).as_posix() != relative:
+            raise ValueError(f"Stage root spelling differs from the plan: {relative!r}")
+        selected.append((path, relative, info))
+    return selected
+
+
+def stage_entries(directories):
+    for path, relative, info in directories:
+        yield path, relative, info
+        yield from snapshot_entries(path, relative + "/")
+
+
+def create_plan_bundle(plan, output):
+    checked_stat(plan.parent)
+    directory = plan.parent.resolve(strict=True)
+    plan = directory / plan.name
+    info = checked_stat(plan)
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError("--plan must point to a regular JSON file")
+    if info.st_size > MAX_PLAN_BYTES:
+        raise ValueError("plan.json exceeds 256 KiB")
+    plan_data = read_snapshot_file(plan, info)
+    roots, _ = plan_stage_roots(plan_data)
+    directories = stage_directories(directory, roots)
+    output = output.parent.resolve(strict=True) / output.name
+    if any(output.is_relative_to(path) for path, _, _ in directories):
+        raise ValueError("Keep the output ZIP outside the selected stage directories")
+    return write_bundle(stage_entries(directories), output, plan_data)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--input", type=Path, help="archive a prepared directory containing plan.json")
+    source.add_argument("--plan", type=Path, help="archive a plan file and its declared stage directories")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        digest = create_bundle(args.input, args.output)
+        if args.plan is not None:
+            digest = create_plan_bundle(args.plan, args.output)
+        else:
+            digest = create_bundle(args.input, args.output)
     except (OSError, ValueError, RuntimeError, zipfile.BadZipFile) as error:
         print(f"Cannot package deployment: {error}", file=sys.stderr)
         return 3
