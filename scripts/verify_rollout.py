@@ -126,6 +126,8 @@ def check_plans(node, entry, example, checks):
         staged_plan = json.loads(checkpoints.read_text(encoding="utf-8"))
         stages = staged_plan["checkpoints"]
         stages[1]["root"] = "fixed"
+        if patch >= 27:
+            staged_plan["candidate"]["rebind_all"] = True
         plan.write_text(json.dumps(staged_plan), encoding="utf-8")
         gate("fixed-checkpoints-pass", plan, 0, schema=2)
         stages[1]["name"] = stages[0]["name"]
@@ -147,6 +149,8 @@ def check_plans(node, entry, example, checks):
             stage = blocked["checkpoints"][0]["result"]
             assert len(stage["existing_conflicts"]) == 1 and not stage["new_conflicts"]
             policy_plan["checkpoints"] = [{**phase, "root": "fixed"}]
+            if patch >= 27:
+                policy_plan["checkpoints"][0]["rebind_all"] = True
             plan.write_text(json.dumps(policy_plan), encoding="utf-8")
             gate("strict-policy-allows-a-resolved-baseline-conflict", plan, 0, schema=2)
             policy_plan["policy"] = "typo"
@@ -238,6 +242,54 @@ def check_plans(node, entry, example, checks):
                              environment=a, checkpoints=[pending, removed], candidate=shared)
         assert [stage["name"] for stage in result["checkpoints"]] == ["removed"]
         assert result["candidate"]["complete"] and len(result["issues"]) == 1
+
+    if patch >= 27:
+        check_reconfigured_bindings(example, plan, gate)
+
+
+def check_reconfigured_bindings(example, plan, gate):
+    def snapshot(name, units):
+        directory = example / name / "usr/lib/systemd/system"
+        directory.mkdir(parents=True)
+        for unit, content in units.items():
+            (directory / unit).write_text("[Socket]\n" + content, encoding="utf-8")
+        return {"root": name, "units": list(units)}
+
+    legacy, next_unit = "legacy.socket", "next.socket"
+    old_binding = "ListenStream=0.0.0.0:45391\n"
+    next_binding = "ListenStream=127.0.0.1:45391\n"
+    initial = snapshot("before-reconfiguration", {legacy: old_binding})
+    collision = snapshot("old-listener-overlap", {legacy: old_binding, next_unit: next_binding})
+    moved = snapshot("port-changed", {legacy: "ListenStream=0.0.0.0:45392\n", next_unit: next_binding})
+    missing = snapshot("missing-retained-unit", {next_unit: next_binding})
+    v6_binding = "ListenStream=[::]:45391\n"
+    dual = snapshot("old-dual-stack", {legacy: v6_binding + "BindIPv6Only=both\n"})
+    v6_only = snapshot("new-v6-only", {legacy: v6_binding + "BindIPv6Only=ipv6-only\n",
+                                      next_unit: next_binding})
+    environment = {"ipv6": "enabled", "bindv6only": "1"}
+
+    def check(label, before, candidate, code, checkpoints=(), status=None):
+        spec = {"schema_version": 2, "policy": "require-clear", "environment": environment,
+                "baseline": before, "checkpoints": list(checkpoints), "candidate": candidate}
+        plan.write_text(json.dumps(spec), encoding="utf-8")
+        return gate(label, plan, code, schema=2, status=status)
+
+    for label, before, after in (("changed-port", initial, moved), ("changed-ipv6-mode", dual, v6_only)):
+        blocked = check(label + "-needs-rebind", before, after, 2)
+        assert blocked.get("candidate") is None and not blocked["complete"]
+        issue, = blocked["issues"]
+        assert issue["code"] == "unverified_rebind" and legacy in issue["message"]
+        assert check(label + "-with-confirmed-rebind", before, {**after, "rebind_all": True}, 0)["complete"]
+
+    overlap = {"name": "overlap", **collision}
+    report = check("confirmed-conflict-precedes-later-binding-reconfiguration", initial, moved,
+                   1, [overlap], status="conflict")
+    assert not report["complete"] and report["issues"][0]["code"] == "unverified_rebind"
+    assert report["checkpoints"][0]["result"]["new_conflicts"][0]["port"] == 45391
+
+    invalid = check("invalid-retained-unit-precedes-binding-reconfiguration",
+                    initial, {**missing, "units": [legacy, next_unit]}, 3, [overlap])
+    assert {issue["code"] for issue in invalid["issues"]} == {"unverified_rebind", "missing_fragment"}
 
 
 def verify(archive, receipt):

@@ -103,25 +103,53 @@ fn analyze_checkpoints(
   let checkpoints = input.checkpoints.map(checkpoint => {
     StagedCheckpoint::{ name: checkpoint.name, stage: stage(checkpoint.units), }
   })
-  analyze_staged_rollout(stage(input.baseline), checkpoints, stage(input.candidate), require_clear~)
+  evaluate_stages(
+    stage(input.baseline), checkpoints, stage(input.candidate), require_clear~,
+    check_rebinds=false,
+  )
+}
+
+///|
+fn binding_signatures(report : Report) -> Map[String, Array[String]] {
+  let signatures : Map[String, Array[String]] = Map([])
+  for unit in report.units {
+    if unit.issues.is_empty() {
+      let bindings = unit.comparable_listeners.map(listener => {
+        let mode = listener.ipv6_mode.unwrap_or("")
+        "\{listener.family}|\{listener.address}|\{listener.port}|\{mode}"
+      })
+      bindings.sort_by(compare_ascii_paths)
+      signatures[unit.name] = bindings
+    }
+  }
+  signatures
 }
 
 ///|
 fn pending_rebind_units(
-  previous : StageInput,
-  current : StageInput,
+  previous_stage : (StageInput, Report),
+  current_stage : (StageInput, Report),
   pending : Array[String],
 ) -> Array[String] {
+  let (previous, previous_scan) = previous_stage
+  let (current, current_scan) = current_stage
   if current.rebind_all {
     return []
   }
-  let changed = previous.environment.ipv6 != current.environment.ipv6 ||
+  let environment_changed = previous.environment.ipv6 != current.environment.ipv6 ||
     previous.environment.bindv6only != current.environment.bindv6only
+  let before = binding_signatures(previous_scan)
+  let after = binding_signatures(current_scan)
   let retained : Array[String] = []
   for unit in current.units {
-    if pending.contains(unit.name) ||
-      (changed && previous.units.any(old => old.name == unit.name)) {
-      retained.push(unit.name)
+    if previous.units.any(old => old.name == unit.name) {
+      let bindings_changed = match (before.get(unit.name), after.get(unit.name)) {
+        (Some(old), Some(new)) => old != new
+        _ => true
+      }
+      if environment_changed || bindings_changed || pending.contains(unit.name) {
+        retained.push(unit.name)
+      }
     }
   }
   retained.sort_by(compare_ascii_paths)
@@ -140,14 +168,25 @@ fn append_stage_input_issues(report : Report, stage : String, issues : Array[Iss
 }
 
 ///|
-/// Compare against the baseline, guarding environment changes between adjacent
-/// stages when a unit may keep sockets created under the old environment.
+/// Compare against the baseline, guarding effective binding and environment
+/// changes between adjacent stages when a unit may keep old sockets.
 /// Other stages keep their comparison results while binding coverage is incomplete.
 pub fn analyze_staged_rollout(
   baseline : StageInput,
   checkpoints : Array[StagedCheckpoint],
   candidate : StageInput,
   require_clear~ : Bool = false,
+) -> CheckpointRolloutReport {
+  evaluate_stages(baseline, checkpoints, candidate, require_clear~, check_rebinds=true)
+}
+
+///|
+fn evaluate_stages(
+  baseline : StageInput,
+  checkpoints : Array[StagedCheckpoint],
+  candidate : StageInput,
+  require_clear~ : Bool,
+  check_rebinds~ : Bool,
 ) -> CheckpointRolloutReport {
   if checkpoints.length() > max_checkpoints {
     return checkpoint_rollout_error("Choose at most \{max_checkpoints} checkpoints.")
@@ -166,7 +205,7 @@ pub fn analyze_staged_rollout(
     return checkpoint_rollout_error("Invalid target IPv6 environment.")
   }
   let before = analyze_group(baseline.units, baseline.environment)
-  let mut previous = baseline
+  let mut previous = (baseline, before)
   let mut pending : Array[String] = []
   let mut invalid_input = before.exit_code == 3
   let comparisons : Array[CheckpointResult] = []
@@ -176,9 +215,12 @@ pub fn analyze_staged_rollout(
   let mut coverage_missing = false
   for checkpoint in stages {
     let current = checkpoint.stage
-    pending = pending_rebind_units(previous, current, pending)
-    previous = current
     let scan = analyze_group(current.units, current.environment)
+    if check_rebinds {
+      let stage = (current, scan)
+      pending = pending_rebind_units(previous, stage, pending)
+      previous = stage
+    }
     if !pending.is_empty() {
       coverage_missing = true
       let names = pending.join(", ")

@@ -293,3 +293,36 @@ test "a removed socket can return with confirmed bindings after an uncertain sta
   assert_eq(report.checkpoints.map(checkpoint => checkpoint.name), ["removed"])
   assert_eq(report.candidate.map_or(0, result => result.new_conflicts.length()), 1)
 }
+
+///|
+test "retained binding comparison ignores order and source positions and preserves multiplicity" {
+  let env = Environment::{ ipv6: "enabled", bindv6only: "1", }
+  let first = "ListenStream=127.0.0.1:45391"
+  let second = "ListenStream=127.0.0.1:45392"
+  let snapshot = fn(text : String) -> StageInput {
+    {
+      units: [test_unit("legacy.socket", [text])],
+      environment: env,
+      rebind_all: false,
+    }
+  }
+  let baseline = snapshot("[Socket]\n\{first}\n\{second}\n")
+  let moved_lines = snapshot("[Socket]\n# modified\n\{second}\n\{first}\n")
+  let duplicated = snapshot("[Socket]\n\{first}\n\{second}\n\{first}\n")
+  assert_eq(analyze_staged_rollout(baseline, [], moved_lines).exit_code, 0)
+  assert_eq(analyze_staged_rollout(baseline, [], duplicated).exit_code, 2)
+}
+
+///|
+test "the snapshot checkpoint interfaces still compare resolved bindings" {
+  let before = test_unit("legacy.socket", ["[Socket]\nListenStream=127.0.0.1:45391"])
+  let after = test_unit("legacy.socket", ["[Socket]\nListenStream=127.0.0.1:45392"])
+  let input = CheckpointRolloutInput::{
+    baseline: [before],
+    checkpoints: [],
+    candidate: [after],
+    environment: { ipv6: "enabled", bindv6only: "1", },
+  }
+  assert_eq(analyze_checkpoint_rollout(input).exit_code, 0)
+  assert_eq(analyze_strict_checkpoint_rollout(input).exit_code, 0)
+}

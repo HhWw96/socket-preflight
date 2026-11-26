@@ -124,6 +124,85 @@ def run_controlled(cli, root, label, files, endpoints, bindv6only, expected, loc
         lab.cleanup()
 
 
+def verify_binding_reconfiguration(cli, work):
+    legacy, incoming = "legacy.socket", "incoming.socket"
+    port = "45395"
+    tcp4 = f"127.0.0.1:{port}"
+    legacy_text = f"[Socket]\nListenStream=[::]:{port}\nBindIPv6Only=both\n"
+    incoming_text = f"[Socket]\nListenStream={tcp4}\n"
+    override = ADMIN + legacy + ".d/20-ipv6-only.conf"
+    override_text = "[Socket]\nBindIPv6Only=ipv6-only\n"
+    for tree, files in (
+        ("old-bindings", {VENDOR + legacy: legacy_text}),
+        ("new-bindings", {VENDOR + legacy: legacy_text, VENDOR + incoming: incoming_text,
+                          override: override_text}),
+    ):
+        for path, text in files.items():
+            target = work / tree / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+    plan = {
+        "schema_version": 2, "policy": "require-clear", "checkpoints": [],
+        "environment": {"ipv6": "enabled", "bindv6only": "1"},
+        "baseline": {"root": "old-bindings", "units": [legacy]},
+        "candidate": {"root": "new-bindings", "units": [legacy, incoming]},
+    }
+    plan_file = work / "reconfigured-bindings.json"
+    gate = {}
+    for name, rebind, expected in (("reload_only", False, 2), ("recreated", True, 0)):
+        plan["candidate"]["rebind_all"] = rebind
+        plan_file.write_text(json.dumps(plan), encoding="utf-8")
+        proc = run("node", cli, "rollout", "--plan", plan_file, "--json", check=False)
+        result = json.loads(proc.stdout)
+        assert proc.returncode == result["exit_code"] == expected, result
+        assert result["complete"] == rebind, result
+        if not rebind:
+            issue, = result["issues"]
+            assert issue["code"] == "unverified_rebind" and legacy in issue["message"]
+        gate[name] = result
+
+    lab = SandboxUnits()
+    try:
+        anchor, ns = lab.start_private_network()
+        run("nsenter", "--net=" + ns, "sysctl", "-w", "net.ipv6.bindv6only=1")
+        for unit, config in ((legacy, legacy_text), (incoming, incoming_text)):
+            lab.write(VENDOR + unit, config)
+            lab.write(RUNTIME + unit.removesuffix(".socket") + ".service", STUB)
+            lab.write(RUNTIME + unit + ".d/00-isolation.conf",
+                      f"[Unit]\nDefaultDependencies=no\nRequires={anchor}\nAfter={anchor}\n"
+                      f"[Socket]\nNetworkNamespacePath={ns}\n")
+        old, new = lab.name(legacy), lab.name(incoming)
+        run("systemctl", "daemon-reload")
+        run("systemctl", "start", old)
+        assert properties(old)["SubState"] == "listening"
+        assert probe_bind(ns, tcp4, "both") == "EADDRINUSE"
+
+        lab.write(override, override_text)
+        run("systemctl", "daemon-reload")
+        old_report = properties(old)
+        assert old_report["BindIPv6Only"] == "ipv6-only" and old_report["SubState"] == "listening", old_report
+        errno = probe_bind(ns, tcp4, "both")
+        start = run("systemctl", "start", new, check=False)
+        retained = listeners_in(ns, {port})
+        assert errno == "EADDRINUSE" and start.returncode != 0 and len(retained) == 1, (errno, start, retained)
+
+        run("systemctl", "stop", new, old)
+        run("systemctl", "reset-failed", new, old, check=False)
+        assert not listeners_in(ns, {port})
+        rebound = try_order(ns, [old, new], True, {old: 1, new: 1}, ports={port})
+        assert rebound["pass"], rebound
+        return {
+            "reconfigured_binding_check": "bindipv6only-drop-in",
+            "gate": gate,
+            "reload_only": {"configured_mode": old_report["BindIPv6Only"], "listeners": retained,
+                            "new_unit_start_exit": start.returncode, "kernel_bind_errno": errno},
+            "recreated": rebound,
+            "pass": True,
+        }
+    finally:
+        lab.cleanup()
+
+
 def verify_release(release, digest, out):
     data = read_bounded(release)
     if not re.fullmatch(r"[a-f0-9]{64}", digest) or sha(data) != digest:
@@ -145,7 +224,8 @@ def verify_release(release, digest, out):
         binary = release.with_suffix(".cjs").name
         cli = work / binary
         cli.write_bytes(package.read(binary))
-        staged_environments = int(release.stem.rsplit(".", 1)[-1]) >= 24
+        patch = int(release.stem.rsplit(".", 1)[-1])
+        staged_environments = patch >= 24
         rows = []
         for case, stage, folder, endpoints in STAGES:
             if stage != "transition":
@@ -197,6 +277,8 @@ def verify_release(release, digest, out):
                 report = json.loads(proc.stdout)
                 assert proc.returncode == report["exit_code"] == expected, report
                 emit({"stage_environment_check": label, "report": report})
+        if patch >= 27:
+            emit(verify_binding_reconfiguration(cli, work))
     count = sum(len(row["attempts"]) for row in rows)
     passed = count == 30 and all(row["pass"] for row in rows)
     emit({"scenarios": len(rows), "attempts": count, "pass": passed})
