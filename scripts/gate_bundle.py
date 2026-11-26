@@ -18,6 +18,7 @@ import zlib
 MAX_ARCHIVE = 32 * 1024 * 1024
 MAX_EXPANDED = 64 * 1024 * 1024
 MAX_ENTRIES = 4096
+MAX_PLAN_BYTES = 256 * 1024
 PORTABLE = re.compile(r"[A-Za-z0-9_.+@ -]+")
 DEVICE = re.compile(r"CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9]", re.IGNORECASE)
 
@@ -96,13 +97,24 @@ def extract_bundle(data, directory):
     return paths
 
 
-def validate_plan_roots(content, paths):
-    if len(content) > 256 * 1024:
+def unique_plan_fields(pairs):
+    fields = {}
+    for name, value in pairs:
+        if name in fields:
+            raise ValueError(f"Duplicate plan key: {name!r}")
+        fields[name] = value
+    return fields
+
+
+def plan_stage_roots(content):
+    if len(content) > MAX_PLAN_BYTES:
         raise ValueError("plan.json exceeds 256 KiB")
-    plan = json.loads(content.decode("utf-8"))
+    plan = json.loads(content.decode("utf-8"), object_pairs_hook=unique_plan_fields)
     if not isinstance(plan, dict):
         raise ValueError("plan.json must contain an object")
     schema = plan.get("schema_version")
+    if schema not in (1, 2) or isinstance(schema, bool):
+        raise ValueError("Unsupported rollout plan schema")
     policy = "new-conflicts"
     stages = [(name, plan.get(name)) for name in ("baseline", "candidate")]
     if schema == 2:
@@ -113,24 +125,28 @@ def validate_plan_roots(content, paths):
         if not isinstance(checkpoints, list) or len(checkpoints) > 8 or "transition" in plan:
             raise ValueError("Schema 2 requires up to eight checkpoints")
         stages.extend((f"checkpoint {index}", stage) for index, stage in enumerate(checkpoints, 1))
-    elif schema == 1:
+    else:
         if "policy" in plan:
             raise ValueError("A rollout policy requires schema 2")
         if "transition" in plan:
             stages.append(("transition", plan["transition"]))
-    else:
-        raise ValueError("Unsupported rollout plan schema")
+    roots = []
     for name, stage in stages:
         root = stage.get("root") if isinstance(stage, dict) else None
         if not isinstance(root, str):
             raise ValueError(f"{name} requires a ZIP-relative root")
-        if root == ".":
-            continue
         try:
-            relative = "/".join(safe_parts(root))
+            relative = root if root == "." else "/".join(safe_parts(root))
         except ValueError as error:
             raise ValueError(f"{name} root must stay inside the ZIP") from error
-        if paths.get(relative.casefold()) != (relative, True):
+        roots.append((name, relative))
+    return roots, policy
+
+
+def validate_plan_roots(content, paths):
+    roots, policy = plan_stage_roots(content)
+    for name, relative in roots:
+        if relative != "." and paths.get(relative.casefold()) != (relative, True):
             raise ValueError(f"{name} root is not a directory in the ZIP: {relative!r}")
     return policy
 

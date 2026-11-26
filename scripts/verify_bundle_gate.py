@@ -49,6 +49,100 @@ def verify_summaries(script, receipts):
     return results
 
 
+def verify_plan_packaging(pack, workspace, inputs, run, checks):
+    def package(mode, source, output, expected=0):
+        proc = subprocess.run([sys.executable, pack, mode, source, "--output", output],
+                              capture_output=True, timeout=30)
+        assert proc.returncode == expected, (proc.stdout, proc.stderr, output)
+        if expected == 0:
+            assert proc.stdout.decode().strip() == sha(output)
+        return proc
+
+    for case, code in (("bad", 1), ("fixed", 0)):
+        source = workspace / f"selected-source-{case}"
+        with zipfile.ZipFile(inputs / f"debian-{case}.zip") as sample:
+            sample.extractall(source)
+        plan_file = source / "upgrade.json"
+        plan_bytes = (source / "plan.json").read_bytes()
+        plan_file.write_bytes(plan_bytes)
+        unrelated = source / "build-output.bin"
+        with unrelated.open("wb") as f:
+            f.truncate(65 * 1024 * 1024 if case == "bad" else 64)
+        if case == "bad":
+            oversized = workspace / "whole-workspace.zip"
+            result = package("--input", source, oversized, 3)
+            assert b"expanded-size limit" in result.stderr and not oversized.exists()
+
+        # The artifact can sit next to the plan in a normal build directory.
+        artifact = source / "deployment.zip"
+        package("--plan", plan_file, artifact)
+        with zipfile.ZipFile(artifact) as archive:
+            assert archive.read("plan.json") == plan_bytes
+            assert all(name == "plan.json" or name.split("/", 1)[0] in {"before", "overlap", "after"}
+                       for name in archive.namelist())
+        receipt = run(f"plan-zip-{case}", artifact, code)
+        if code:
+            finding, = receipt["rollout"]["transition"]["new_conflicts"]
+            assert finding["port"] == 9090
+            assert {
+                (Path(finding[side]["setting"]["source"]["path"]).name,
+                 finding[side]["setting"]["source"]["line"])
+                for side in ("first", "second")
+            } == {("cockpit.socket", 7), ("20-move-port.conf", 3)}
+        else:
+            assert receipt["rollout"]["complete"]
+        duplicate = source / "deployment-repeat.zip"
+        package("--plan", plan_file, duplicate)
+        assert artifact.read_bytes() == duplicate.read_bytes()
+        package("--plan", plan_file, artifact, 3)
+        assert artifact.read_bytes() == duplicate.read_bytes()
+        inside = source / "before/generated.zip"
+        package("--plan", plan_file, inside, 3)
+        assert not inside.exists()
+
+    original = json.loads(plan_bytes)
+    empty = source / "before/retired"
+    empty.mkdir()
+    named = {
+        "schema_version": 2, "environment": original["environment"],
+        "baseline": original["baseline"], "candidate": original["candidate"],
+        "checkpoints": [{"name": "repeated", **original["baseline"]},
+                        {"name": "retired", "root": "before/retired", "units": []}],
+    }
+    plan_file.write_text(json.dumps(named), encoding="utf-8")
+    staged = workspace / "selected-stages.zip"
+    package("--plan", plan_file, staged)
+    with zipfile.ZipFile(staged) as archive:
+        members = archive.namelist()
+        assert members.count("before/") == members.count("before/retired/") == 1
+    run("plan-zip-repeated-and-nested-roots", staged, 0)
+
+    rejected = workspace / "selected-invalid.zip"
+    for root in ("before/nonexistent", "../outside", "."):
+        plan_file.write_text(json.dumps({**named, "candidate": {"root": root, "units": []}}), encoding="utf-8")
+        package("--plan", plan_file, rejected, 3)
+        assert not rejected.exists()
+    plan_file.write_text(json.dumps(named).replace('"schema_version": 2,',
+                         '"schema_version": 2, "schema_version": 2,'), encoding="utf-8")
+    package("--plan", plan_file, rejected, 3)
+    assert not rejected.exists()
+    checks["plan-zip-paths-and-no-overwrite"] = {"pass": True}
+
+    link = source / "linked-stage"
+    try:
+        link.symlink_to(source / "before", target_is_directory=True)
+    except OSError:
+        if sys.platform == "linux":
+            raise
+        checks["plan-zip-link-component"] = {"status": "skipped"}
+    else:
+        plan_file.write_text(json.dumps({**named, "candidate": {
+            "root": "linked-stage/retired", "units": []}}), encoding="utf-8")
+        package("--plan", plan_file, rejected, 3)
+        assert not rejected.exists()
+        checks["plan-zip-link-component"] = {"pass": True}
+
+
 def verify(release, inputs):
     checks = {}
     with tempfile.TemporaryDirectory(prefix="socket gate test ") as work:
@@ -86,6 +180,8 @@ def verify(release, inputs):
 
         bad = inputs / "debian-bad.zip"
         fixed = inputs / "debian-fixed.zip"
+        if int(entry.rsplit(".", 2)[-2]) >= 28:
+            verify_plan_packaging(pack, root, inputs, run, checks)
         result = run("bad", bad, 1)
         finding, = result["rollout"]["transition"]["new_conflicts"]
         assert finding["code"] == "dual_stack_overlap"
@@ -233,7 +329,12 @@ def main():
     result = verify(args.release, args.inputs)
     if args.report:
         args.report.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    print(f"{len(result['checks'])} bundle gate checks passed", flush=True)
+    skipped = sum(check.get("status") == "skipped" for check in result["checks"].values())
+    passed = len(result["checks"]) - skipped
+    message = f"{passed} bundle gate checks passed"
+    if skipped:
+        message += f", {skipped} skipped"
+    print(message, flush=True)
 
 
 if __name__ == "__main__":
