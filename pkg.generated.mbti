@@ -14,6 +14,8 @@ pub fn analyze_rollout(RolloutInput) -> RolloutReport
 
 pub fn analyze_staged_rollout(StageInput, Array[StagedCheckpoint], StageInput, require_clear? : Bool) -> CheckpointRolloutReport
 
+pub fn analyze_staged_rollout_with_rebinds(StageInput, Array[StagedCheckpoint], StageInput, Map[String, Array[String]], require_clear? : Bool) -> CheckpointRolloutReport
+
 pub fn analyze_strict_checkpoint_rollout(CheckpointRolloutInput) -> CheckpointRolloutReport
 
 pub fn command_error(String) -> Report

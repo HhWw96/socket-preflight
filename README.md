@@ -1,4 +1,4 @@
-# SocketPreflight v0.0.28
+# SocketPreflight v0.0.29
 
 SocketPreflight 在部署前检查拟同时启动的 systemd `.socket` 单元。它从配置快照选出生效的主文件和 drop-in，计算 TCP 监听地址，报告同一单元内或不同单元间争抢端口的两条配置及其生效行号。
 
@@ -6,30 +6,30 @@ SocketPreflight 在部署前检查拟同时启动的 systemd `.socket` 单元。
 
 ## 发布与安装
 
-当前版本提供 GitHub CLI 发行包和 Mooncakes 模块。两者都可按版本获取。较早的二进制包可从发行历史下载。[GitHub v0.0.28](https://github.com/HhWw96/socket-preflight/releases/tag/v0.0.28) · [Mooncakes](https://mooncakes.io/docs/HhWw96/socket-preflight@0.0.28/)
+当前版本提供 GitHub CLI 发行包和 Mooncakes 模块。两者都可按版本获取。较早的二进制包可从发行历史下载。[GitHub v0.0.29](https://github.com/HhWw96/socket-preflight/releases/tag/v0.0.29) · [Mooncakes](https://mooncakes.io/docs/HhWw96/socket-preflight@0.0.29/)
 
 项目采用 MIT 许可证。第三方声明列明 MoonBit 标准库及 Debian 样本的来源和许可文件。[MIT 许可证](LICENSE) · [第三方声明](THIRD_PARTY.md)
 
 在 MoonBit 项目中安装当前版本。
 
 ```text
-moon add HhWw96/socket-preflight@0.0.28
+moon add HhWw96/socket-preflight@0.0.29
 ```
 
 ## 运行
 
-从导出目录发现 `.socket` 文件时，运行 `node socket-preflight-v0.0.28.cjs inventory --root examples/conflict --json`。清单列出候选名称、每个片段的路径和类型，以及该路径是否参与扫描。它只读取目录和文件类型，单元是否会启动仍由部署计划决定。退出码 `2` 表示某些目录或条目无法读取，已发现的候选仍保留。
+从导出目录发现 `.socket` 文件时，运行 `node socket-preflight-v0.0.29.cjs inventory --root examples/conflict --json`。清单列出候选名称、每个片段的路径和类型，以及该路径是否参与扫描。它只读取目录和文件类型，单元是否会启动仍由部署计划决定。退出码 `2` 表示某些目录或条目无法读取，已发现的候选仍保留。
 
 解压发行包，在解压目录用 Node.js 24 运行。示例中的 `public.socket` 监听 `[::]:45391`，并允许 IPv4 共用 IPv6 监听。`admin.socket` 的配置覆盖另外加入了 `127.0.0.1:45391`。
 
 ```text
-node socket-preflight-v0.0.28.cjs scan --root examples/conflict --ipv6 enabled admin.socket public.socket
+node socket-preflight-v0.0.29.cjs scan --root examples/conflict --ipv6 enabled admin.socket public.socket
 ```
 
 程序退出 `1`，指出 `etc/systemd/system/admin.socket.d/20-site.conf:2` 和 `usr/lib/systemd/system/public.socket:5`。同名但低优先级的 `20-site.conf` 不参与判定。下面的对照样本用 `90-reset.conf` 清除 admin 之前的两个监听地址，再加一个新端口。退出 `0`，输出重置发生的位置。
 
 ```text
-node socket-preflight-v0.0.28.cjs scan --root examples/fixed --ipv6 enabled admin.socket public.socket
+node socket-preflight-v0.0.29.cjs scan --root examples/fixed --ipv6 enabled admin.socket public.socket
 ```
 
 加 `--json` 可接入流水线。JSON 包含 `schema_version: 1`、选中的文件、被覆盖的文件、被清除的原始监听、可比较端点、冲突及未覆盖条件。每个冲突给出两侧规范化地址和从 1 开始的行号。跨物理行的配置另带结束行号。
@@ -46,7 +46,7 @@ node socket-preflight-v0.0.28.cjs scan --root examples/fixed --ipv6 enabled admi
 `compare` 以同一组单元及目标内核设置比较部署前后的两个快照。下例模拟把修正后的快照换成有冲突的候选，退出 `1`。互换两个路径，已消除的冲突仍显示来源，命令退出 `0`。
 
 ```text
-node socket-preflight-v0.0.28.cjs compare --baseline examples/fixed --candidate examples/conflict --ipv6 enabled --json admin.socket public.socket
+node socket-preflight-v0.0.29.cjs compare --baseline examples/fixed --candidate examples/conflict --ipv6 enabled --json admin.socket public.socket
 ```
 
 结果包含 `new_conflicts`、`existing_conflicts`、`resolved_conflicts` 和两份扫描报告。按单元和规范化的绑定地址去重，移动配置行或改变等价的地址写法不会产生新的发现。如果某个配对的另一侧没有足够证据，差异留在 `uncertain_new` 或 `uncertain_resolved`。详情截断也会使比较不完整。
@@ -55,15 +55,15 @@ node socket-preflight-v0.0.28.cjs compare --baseline examples/fixed --candidate 
 
 主机网络设置也可单独比较。对 `compare` 传入 `--candidate-ipv6` 或 `--candidate-bindv6only` 即可覆盖候选环境，基线继续使用原来的环境选项。即使两份配置相同，也能检查将 `net.ipv6.bindv6only` 从 `1` 改为 `0` 是否引入双栈重叠。目标值未知且会影响判定时，结果仍为未确定。MoonBit 提供显式的 `compare_target_reports` 接口，常规 `compare_reports` 继续要求两侧使用同环境。
 
-代码审查可对 `scan` 或 `compare` 使用 `--sarif` 输出 SARIF 2.1.0。例如从工作区根目录执行 `node socket-preflight-v0.0.28.cjs compare --baseline examples/fixed --candidate examples/conflict --ipv6 enabled --sarif admin.socket public.socket > preflight.sarif`。结果保留两处来源和各自的行号。比较输出包含新增冲突、待确认变化和覆盖问题。路径对应当前工作区，退出码沿用原命令。
+代码审查可对 `scan` 或 `compare` 使用 `--sarif` 输出 SARIF 2.1.0。例如从工作区根目录执行 `node socket-preflight-v0.0.29.cjs compare --baseline examples/fixed --candidate examples/conflict --ipv6 enabled --sarif admin.socket public.socket > preflight.sarif`。结果保留两处来源和各自的行号。比较输出包含新增冲突、待确认变化和覆盖问题。路径对应当前工作区，退出码沿用原命令。
 
 ## 部署切换阶段
 
 `rollout` 接受一份 UTF-8 JSON 计划，把候选和可选的共存阶段分别与部署前比较。旧单元和新单元分别能够监听，但在切换窗口同时启用会抢同一端口。两条命令分别退出 `1` 和 `0`。
 
 ```text
-node socket-preflight-v0.0.28.cjs rollout --plan examples/rollout/bad.json
-node socket-preflight-v0.0.28.cjs rollout --plan examples/rollout/fixed.json --json
+node socket-preflight-v0.0.29.cjs rollout --plan examples/rollout/bad.json
+node socket-preflight-v0.0.29.cjs rollout --plan examples/rollout/fixed.json --json
 ```
 
 计划采用 `schema_version: 1`，含 `environment`（`ipv6` 和 `bindv6only`）、`baseline`、`candidate` 及可选 `transition`。每个阶段填写 `root` 和 `units`。相对目录以计划文件所在目录为准。每个 `units` 列表显式声明会同时监听的 0–64 个单元，空列表表示该阶段没有监听单元。声明存在却缺少配置会返回输入错误。
@@ -76,7 +76,7 @@ Schema 2 可设置 `"policy": "require-clear"`。任一检查点或最终候选�
 
 Schema 2 的基线、每个检查点和候选可单独设置 `environment`，填写 `ipv6` 与 `bindv6only`。省略时使用计划顶层默认值。相邻阶段保留同名单元时，门禁检查环境和生效绑定是否一致。端口、规范化地址或 IPv6 模式变化后，已打开的监听需要确认重建。重新排序与注释改动允许沿用原监听。只有该阶段所有监听确实重建时，才设置 `rebind_all: true`。待确认状态会随单元延续到后续阶段，直到该单元移除或明确重建。报告在 `issues` 中列出受影响的阶段和单元，只为其余阶段输出比较结果。
 
-升级现有 Schema 2 计划时，如先将 SSH 从旧端口临时切换再切回，将实际重建监听的步骤设为相应阶段，再声明 `rebind_all: true`。只执行 `daemon-reload` 仍需确认实际监听。
+如果部署过程只重启某些套接字，可在检查点或候选中声明 `"rebind_units": ["ssh.socket"]`。每个名称必须是该阶段列出的单元，且只能出现一次。同一阶段使用一项重建声明。只执行 `daemon-reload` 时，受影响的监听仍需确认。MoonBit 调用者可通过 `analyze_staged_rollout_with_rebinds` 按检查点名称或 `candidate` 传入单元列表。
 
 任何阶段待确认时，整个计划的 `complete` 为 `false`。门禁优先报告输入错误（退出 `3`），随后报告策略拦截的已确认冲突（退出 `1`），仅有待确认项时退出 `2`。MoonBit 调用方可用 `analyze_staged_rollout`。
 
@@ -91,10 +91,10 @@ Schema 2 的基线、每个检查点和候选可单独设置 `environment`，填
 ```yaml
   preflight:
     needs: build
-    uses: HhWw96/socket-preflight/.github/workflows/preflight.yml@v0.0.28
+    uses: HhWw96/socket-preflight/.github/workflows/preflight.yml@v0.0.29
     with:
       deployment_artifact: deployment-input
-      release_tag: v0.0.28
+      release_tag: v0.0.29
       release_sha256: ${{ vars.SOCKET_PREFLIGHT_RELEASE_SHA256 }}
       receipt_artifact: socketpreflight-receipt
 ```
@@ -112,7 +112,7 @@ python package_deployment.py --plan workspace/rollout.json --output workspace/de
 将现有格式的 `plan.json` 放在部署 ZIP 根目录，阶段的 `root` 指向包内目录。在解压后的 SocketPreflight 发行包目录运行以下命令。需要 Python 3.10+ 和 Node.js 24。
 
 ```text
-python gate_bundle.py --bundle deployment.zip --cli socket-preflight-v0.0.28.cjs --report receipt.json
+python gate_bundle.py --bundle deployment.zip --cli socket-preflight-v0.0.29.cjs --report receipt.json
 ```
 
 门禁在独立临时目录解包，用 MoonBit CLI 检查计划。回执记录实际读取的 ZIP 和 CLI 的 SHA-256、退出码及完整的 `rollout` JSON。退出 `0` 表示回执已写入且可放行，`1` 表示新增冲突，`2` 表示覆盖不足，`3` 表示输入、执行或回执写入失败。ZIP 上限为 32 MiB，最多 4096 条目，展开上限 64 MiB。目录、文件和阶段路径使用可携带的 ASCII 文件名。
@@ -120,8 +120,8 @@ python gate_bundle.py --bundle deployment.zip --cli socket-preflight-v0.0.28.cjs
 发行包中的 `samples` 已包含两份锁定的 Debian 示例。解压后可执行本地流水线演练，每个 `--out` 使用新目录。
 
 ```text
-python deployment_pipeline.py run --bundle samples/debian-bad.zip --cli socket-preflight-v0.0.28.cjs --out run-bad
-python deployment_pipeline.py run --bundle samples/debian-fixed.zip --cli socket-preflight-v0.0.28.cjs --out run-fixed
+python deployment_pipeline.py run --bundle samples/debian-bad.zip --cli socket-preflight-v0.0.29.cjs --out run-bad
+python deployment_pipeline.py run --bundle samples/debian-fixed.zip --cli socket-preflight-v0.0.29.cjs --out run-fixed
 ```
 
 坏例退出 `1` 并保留回执。修正版再次核对部署 ZIP 和工具 SHA-256 后生成 `would-deploy.json`。该记录代表演练放行。仓库源码中的 GitHub Actions 工作流以指定的发布标签和发行包 SHA-256 为输入，分别可运行 `bad` 和 `fixed`。门禁步骤失败时下游作业跳过，门禁回执仍可下载。
@@ -133,8 +133,8 @@ python deployment_pipeline.py run --bundle samples/debian-fixed.zip --cli socket
 `examples/rollout` 包含依据公开故障重建的部署前、共存、部署后和修正快照。用下面两条命令单独检查共存窗口，预期先退出 `1`，再退出 `0`。 [systemd #14044](https://github.com/systemd/systemd/issues/14044)
 
 ```text
-node socket-preflight-v0.0.28.cjs scan --root examples/rollout/overlap --ipv6 enabled legacy.socket next.socket
-node socket-preflight-v0.0.28.cjs scan --root examples/rollout/fixed --ipv6 enabled legacy.socket next.socket
+node socket-preflight-v0.0.29.cjs scan --root examples/rollout/overlap --ipv6 enabled legacy.socket next.socket
+node socket-preflight-v0.0.29.cjs scan --root examples/rollout/fixed --ipv6 enabled legacy.socket next.socket
 ```
 
 `--root` 应指向静态导出目录。将文件放在 `etc/systemd/system`、`run/systemd/system`、`usr/local/lib/systemd/system` 或 `usr/lib/systemd/system`，相对根目录保留这个结构。命令行列出的 1–64 个单元构成**一组会同时监听且位于同一网络命名空间的 system 单元**。只指定一个单元时，检查其生效监听之间的冲突，例如未清除原监听就追加覆盖相同地址的 drop-in。部署方负责选定单元并确认快照完整。请勿将活动主机根目录当作完整的离线快照。
@@ -158,7 +158,7 @@ node socket-preflight-v0.0.28.cjs scan --root examples/rollout/fixed --ipv6 enab
 
 ```text
 python scripts/build.py
-python scripts/verify_cli.py dist/socket-preflight-v0.0.28.zip
+python scripts/verify_cli.py dist/socket-preflight-v0.0.29.zip
 python scripts/benchmark.py dist/socket-preflight-v0.0.4.cjs dist/socket-preflight-v0.0.5.cjs --report verification/local-benchmark.json
 ```
 
@@ -169,7 +169,7 @@ python scripts/benchmark.py dist/socket-preflight-v0.0.4.cjs dist/socket-preflig
 在项目源码目录，Windows 和 Linux 可用同一条命令核对发给用户的 ZIP。它解压运行旧接口和部署切换案例，并核对已保存的 systemd 实验回执。下游 MoonBit 模块调用 `analyze_rollout(RolloutInput)`，传入已按加载顺序选择的配置文本。下方第二条命令在一个新的临时 workspace 里运行独立下游模块。
 
 ```text
-python scripts/verify_release.py dist/socket-preflight-v0.0.28.zip
+python scripts/verify_release.py dist/socket-preflight-v0.0.29.zip
 python scripts/verify_consumer.py
 ```
 

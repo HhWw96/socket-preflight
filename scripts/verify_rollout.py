@@ -244,10 +244,10 @@ def check_plans(node, entry, example, checks):
         assert result["candidate"]["complete"] and len(result["issues"]) == 1
 
     if patch >= 27:
-        check_reconfigured_bindings(example, plan, gate)
+        check_reconfigured_bindings(example, plan, gate, selective=patch >= 29)
 
 
-def check_reconfigured_bindings(example, plan, gate):
+def check_reconfigured_bindings(example, plan, gate, selective):
     def snapshot(name, units):
         directory = example / name / "usr/lib/systemd/system"
         directory.mkdir(parents=True)
@@ -268,11 +268,11 @@ def check_reconfigured_bindings(example, plan, gate):
                                       next_unit: next_binding})
     environment = {"ipv6": "enabled", "bindv6only": "1"}
 
-    def check(label, before, candidate, code, checkpoints=(), status=None):
+    def check(label, before, candidate, code, checkpoints=(), status=None, schema=2):
         spec = {"schema_version": 2, "policy": "require-clear", "environment": environment,
                 "baseline": before, "checkpoints": list(checkpoints), "candidate": candidate}
         plan.write_text(json.dumps(spec), encoding="utf-8")
-        return gate(label, plan, code, schema=2, status=status)
+        return gate(label, plan, code, schema=schema, status=status)
 
     for label, before, after in (("changed-port", initial, moved), ("changed-ipv6-mode", dual, v6_only)):
         blocked = check(label + "-needs-rebind", before, after, 2)
@@ -290,6 +290,33 @@ def check_reconfigured_bindings(example, plan, gate):
     invalid = check("invalid-retained-unit-precedes-binding-reconfiguration",
                     initial, {**missing, "units": [legacy, next_unit]}, 3, [overlap])
     assert {issue["code"] for issue in invalid["issues"]} == {"unverified_rebind", "missing_fragment"}
+
+    if selective:
+        monitor = "monitor.socket"
+        watched = snapshot("watched-before", {legacy: old_binding, monitor: "ListenStream=45393\n"})
+        stable = snapshot("watched-stable", {legacy: "ListenStream=45392\n",
+                          monitor: "ListenStream=45393\n", next_unit: next_binding})
+        changed = snapshot("watched-changed", {legacy: "ListenStream=45392\n",
+                           monitor: "ListenStream=45394\n", next_unit: next_binding})
+        declared = {**stable, "rebind_units": [legacy]}
+        assert check("selective-rebind-preserves-monitor", watched, declared, 0)["complete"]
+        waiting = {**changed, "rebind_units": [legacy]}
+        result = check("selective-rebind-leaves-other-binding-pending", watched, waiting, 2)
+        issue, = result["issues"]
+        assert monitor in issue["message"] and legacy not in issue["message"]
+        checkpoint = {**waiting, "name": "first"}
+        report = check("selective-rebind-keeps-earlier-coverage-gap", watched,
+                       {**changed, "rebind_units": [monitor]}, 2, [checkpoint])
+        assert report["candidate"]["complete"] and len(report["issues"]) == 1
+        for label, declarations, schema in (
+            ("unknown", {"rebind_units": ["unknown.socket"]}, 2),
+            ("duplicate", {"rebind_units": [legacy, legacy]}, 2),
+            ("mixed", {"rebind_units": [legacy], "rebind_all": True}, 2),
+            ("wrong-type", {"rebind_units": legacy}, 1),
+        ):
+            check(f"invalid-selective-rebind-{label}", watched, {**stable, **declarations}, 3,
+                  status="input_error", schema=schema)
+        check("selective-rebind-not-allowed-at-baseline", {**watched, "rebind_units": [legacy]}, stable, 3, schema=1)
 
 
 def verify(archive, receipt):

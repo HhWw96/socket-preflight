@@ -49,7 +49,7 @@ fn load_plan_stage(
 ///|
 priv enum LoadedRollout {
   Legacy(@preflight.RolloutInput)
-  Staged(@preflight.StageInput, Array[@preflight.StagedCheckpoint], @preflight.StageInput, Bool)
+  Staged(@preflight.StageInput, Array[@preflight.StagedCheckpoint], @preflight.StageInput, Bool, Map[String, Array[String]])
 }
 
 ///|
@@ -72,6 +72,7 @@ fn load_staged_plan(
   json : Json?,
   fallback : @preflight.Environment,
   budget : Budget,
+  rebind_units : Map[String, Array[String]],
   named~ : Bool = false,
 ) -> Result[@preflight.StageInput, String] {
   guard json is Some(Object(fields)) else { return Err("\{label} must be an object.") }
@@ -91,6 +92,21 @@ fn load_staged_plan(
     Some(True) => { expected_fields += 1; true }
     Some(False) => { expected_fields += 1; false }
     _ => return Err("\{label} rebind_all must be a boolean.")
+  }
+  if fields.get("rebind_units") is Some(value) {
+    guard label != "baseline" && value is Array(values) &&
+      values.length() <= @preflight.max_units else {
+      return Err("\{label}: rebind_units requires a list of .socket names at a checkpoint or candidate.")
+    }
+    let units = []
+    for value in values {
+      guard value is String(unit) && @preflight.supported_unit_name(unit) else {
+        return Err("\{label}: rebind_units requires literal .socket names.")
+      }
+      units.push(unit)
+    }
+    rebind_units[label] = units
+    expected_fields += 1
   }
   match load_plan_stage(directory, label, json, budget, expected_fields~) {
     Ok(units) => Ok({ units, environment, rebind_all, })
@@ -142,11 +158,12 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
   let limit = 4 * 1024 * 1024
   let budget : Budget = { remaining: limit, }
   if checkpoints is Some(checkpoints) {
-    let baseline = match load_staged_plan(directory, "baseline", fields.get("baseline"), environment, budget) {
+    let rebind_units : Map[String, Array[String]] = Map([])
+    let baseline = match load_staged_plan(directory, "baseline", fields.get("baseline"), environment, budget, rebind_units) {
       Ok(stage) => stage
       Err(message) => return Err(message)
     }
-    let candidate = match load_staged_plan(directory, "candidate", fields.get("candidate"), environment, budget) {
+    let candidate = match load_staged_plan(directory, "candidate", fields.get("candidate"), environment, budget, rebind_units) {
       Ok(stage) => stage
       Err(message) => return Err(message)
     }
@@ -160,12 +177,12 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
         return Err("Use distinct literal checkpoint names.")
       }
       names[name] = true
-      match load_staged_plan(directory, name, Some(stage), environment, budget, named=true) {
+      match load_staged_plan(directory, name, Some(stage), environment, budget, rebind_units, named=true) {
         Ok(stage) => stages.push({ name, stage, })
         Err(message) => return Err(message)
       }
     }
-    return Ok(Staged(baseline, stages, candidate, require_clear))
+    return Ok(Staged(baseline, stages, candidate, require_clear, rebind_units))
   }
   let baseline = match
     load_plan_stage(directory, "baseline", fields.get("baseline"), budget) {
@@ -240,8 +257,10 @@ fn run_rollout(args : ArrayView[String]) -> Unit {
   }
   let report = match input {
     Ok(Legacy(plan)) => @preflight.analyze_rollout(plan)
-    Ok(Staged(baseline, stages, candidate, require_clear)) => {
-      let result = @preflight.analyze_staged_rollout(baseline, stages, candidate, require_clear~)
+    Ok(Staged(baseline, stages, candidate, require_clear, rebind_units)) => {
+      let result = @preflight.analyze_staged_rollout_with_rebinds(
+        baseline, stages, candidate, rebind_units, require_clear~,
+      )
       emit_checkpoint_rollout(result, json)
       return
     }

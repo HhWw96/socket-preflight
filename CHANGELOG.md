@@ -1,5 +1,10 @@
 # 更新记录
 
+## v0.0.29
+
+- Schema 2 支持按阶段声明 `rebind_units`，未确认的保留监听继续阻止部署，已通过阶段仍保留比较结果。
+- MoonBit 新增 `analyze_staged_rollout_with_rebinds`，接受同样的逐阶段重建声明。
+
 ## v0.0.28
 
 - 部署打包器新增 `--plan`，直接从现有工作目录收集明确声明的阶段目录，并在 ZIP 根保存计划原件。

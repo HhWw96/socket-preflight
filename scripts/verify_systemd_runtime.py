@@ -124,7 +124,7 @@ def run_controlled(cli, root, label, files, endpoints, bindv6only, expected, loc
         lab.cleanup()
 
 
-def verify_binding_reconfiguration(cli, work):
+def verify_binding_reconfiguration(cli, work, selective):
     legacy, incoming = "legacy.socket", "incoming.socket"
     port = "45395"
     tcp4 = f"127.0.0.1:{port}"
@@ -132,11 +132,16 @@ def verify_binding_reconfiguration(cli, work):
     incoming_text = f"[Socket]\nListenStream={tcp4}\n"
     override = ADMIN + legacy + ".d/20-ipv6-only.conf"
     override_text = "[Socket]\nBindIPv6Only=ipv6-only\n"
+    monitor = "monitor.socket"
+    monitor_port = "45396"
+    monitor_text = f"[Socket]\nListenStream=127.0.0.1:{monitor_port}\n"
     for tree, files in (
         ("old-bindings", {VENDOR + legacy: legacy_text}),
         ("new-bindings", {VENDOR + legacy: legacy_text, VENDOR + incoming: incoming_text,
                           override: override_text}),
     ):
+        if selective:
+            files[VENDOR + monitor] = monitor_text
         for path, text in files.items():
             target = work / tree / path
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -147,10 +152,16 @@ def verify_binding_reconfiguration(cli, work):
         "baseline": {"root": "old-bindings", "units": [legacy]},
         "candidate": {"root": "new-bindings", "units": [legacy, incoming]},
     }
+    if selective:
+        for stage in ("baseline", "candidate"):
+            plan[stage]["units"].append(monitor)
     plan_file = work / "reconfigured-bindings.json"
     gate = {}
     for name, rebind, expected in (("reload_only", False, 2), ("recreated", True, 0)):
-        plan["candidate"]["rebind_all"] = rebind
+        if selective:
+            plan["candidate"]["rebind_units"] = [legacy] if rebind else []
+        else:
+            plan["candidate"]["rebind_all"] = rebind
         plan_file.write_text(json.dumps(plan), encoding="utf-8")
         proc = run("node", cli, "rollout", "--plan", plan_file, "--json", check=False)
         result = json.loads(proc.stdout)
@@ -165,7 +176,10 @@ def verify_binding_reconfiguration(cli, work):
     try:
         anchor, ns = lab.start_private_network()
         run("nsenter", "--net=" + ns, "sysctl", "-w", "net.ipv6.bindv6only=1")
-        for unit, config in ((legacy, legacy_text), (incoming, incoming_text)):
+        configs = {legacy: legacy_text, incoming: incoming_text}
+        if selective:
+            configs[monitor] = monitor_text
+        for unit, config in configs.items():
             lab.write(VENDOR + unit, config)
             lab.write(RUNTIME + unit.removesuffix(".socket") + ".service", STUB)
             lab.write(RUNTIME + unit + ".d/00-isolation.conf",
@@ -174,6 +188,10 @@ def verify_binding_reconfiguration(cli, work):
         old, new = lab.name(legacy), lab.name(incoming)
         run("systemctl", "daemon-reload")
         run("systemctl", "start", old)
+        if selective:
+            run("systemctl", "start", lab.name(monitor))
+            first = run("nsenter", "--net=" + ns, "ss", "-Hlnte", "sport", "=", ":" + monitor_port)
+            assert re.search(r"\bino:[1-9][0-9]*\b", first.stdout), first
         assert properties(old)["SubState"] == "listening"
         assert probe_bind(ns, tcp4, "both") == "EADDRINUSE"
 
@@ -191,6 +209,11 @@ def verify_binding_reconfiguration(cli, work):
         assert not listeners_in(ns, {port})
         rebound = try_order(ns, [old, new], True, {old: 1, new: 1}, ports={port})
         assert rebound["pass"], rebound
+        if selective:
+            last = run("nsenter", "--net=" + ns, "ss", "-Hlnte", "sport", "=", ":" + monitor_port)
+            inode = re.findall(r"\bino:[1-9][0-9]*\b", first.stdout)
+            assert re.findall(r"\bino:[1-9][0-9]*\b", last.stdout) == inode, last
+            rebound["unchanged_monitor_inode"] = inode[0]
         return {
             "reconfigured_binding_check": "bindipv6only-drop-in",
             "gate": gate,
@@ -278,7 +301,7 @@ def verify_release(release, digest, out):
                 assert proc.returncode == report["exit_code"] == expected, report
                 emit({"stage_environment_check": label, "report": report})
         if patch >= 27:
-            emit(verify_binding_reconfiguration(cli, work))
+            emit(verify_binding_reconfiguration(cli, work, selective=patch >= 29))
     count = sum(len(row["attempts"]) for row in rows)
     passed = count == 30 and all(row["pass"] for row in rows)
     emit({"scenarios": len(rows), "attempts": count, "pass": passed})

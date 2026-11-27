@@ -130,6 +130,7 @@ fn pending_rebind_units(
   previous_stage : (StageInput, Report),
   current_stage : (StageInput, Report),
   pending : Array[String],
+  rebind_units : Array[String],
 ) -> Array[String] {
   let (previous, previous_scan) = previous_stage
   let (current, current_scan) = current_stage
@@ -142,7 +143,7 @@ fn pending_rebind_units(
   let after = binding_signatures(current_scan)
   let retained : Array[String] = []
   for unit in current.units {
-    if previous.units.any(old => old.name == unit.name) {
+    if !rebind_units.contains(unit.name) && previous.units.any(old => old.name == unit.name) {
       let bindings_changed = match (before.get(unit.name), after.get(unit.name)) {
         (Some(old), Some(new)) => old != new
         _ => true
@@ -181,25 +182,55 @@ pub fn analyze_staged_rollout(
 }
 
 ///|
+/// Confirm listener recreation for the listed active units at each named
+/// checkpoint or at "candidate". Earlier stages retain their own coverage.
+pub fn analyze_staged_rollout_with_rebinds(
+  baseline : StageInput,
+  checkpoints : Array[StagedCheckpoint],
+  candidate : StageInput,
+  rebind_units : Map[String, Array[String]],
+  require_clear~ : Bool = false,
+) -> CheckpointRolloutReport {
+  evaluate_stages(baseline, checkpoints, candidate, require_clear~, check_rebinds=true, rebind_units~)
+}
+
+///|
 fn evaluate_stages(
   baseline : StageInput,
   checkpoints : Array[StagedCheckpoint],
   candidate : StageInput,
   require_clear~ : Bool,
   check_rebinds~ : Bool,
+  rebind_units~ : Map[String, Array[String]] = Map([]),
 ) -> CheckpointRolloutReport {
   if checkpoints.length() > max_checkpoints {
     return checkpoint_rollout_error("Choose at most \{max_checkpoints} checkpoints.")
   }
-  let names : Map[String, Bool] = Map([])
+  let names : Map[String, StageInput] = Map([])
   for checkpoint in checkpoints {
     if !supported_checkpoint_name(checkpoint.name) || names.contains(checkpoint.name) {
       return checkpoint_rollout_error("Use distinct literal checkpoint names.")
     }
-    names[checkpoint.name] = true
+    names[checkpoint.name] = checkpoint.stage
   }
   let stages = checkpoints.copy()
   stages.push({ name: "candidate", stage: candidate, })
+  names["candidate"] = candidate
+  for name, units in rebind_units {
+    guard names.get(name) is Some(stage) else {
+      return checkpoint_rollout_error("Unknown rebind stage: \{name}.")
+    }
+    if stage.rebind_all {
+      return checkpoint_rollout_error("\{name}: use either rebind_all or rebind_units.")
+    }
+    let seen : Map[String, Bool] = Map([])
+    for unit in units {
+      if seen.contains(unit) || !stage.units.any(input => input.name == unit) {
+        return checkpoint_rollout_error("\{name}: rebind_units must list distinct active .socket units.")
+      }
+      seen[unit] = true
+    }
+  }
   if !valid_environment(baseline.environment) ||
     stages.any(checkpoint => !valid_environment(checkpoint.stage.environment)) {
     return checkpoint_rollout_error("Invalid target IPv6 environment.")
@@ -218,7 +249,7 @@ fn evaluate_stages(
     let scan = analyze_group(current.units, current.environment)
     if check_rebinds {
       let stage = (current, scan)
-      pending = pending_rebind_units(previous, stage, pending)
+      pending = pending_rebind_units(previous, stage, pending, rebind_units.get(checkpoint.name).unwrap_or([]))
       previous = stage
     }
     if !pending.is_empty() {
@@ -226,7 +257,7 @@ fn evaluate_stages(
       let names = pending.join(", ")
       issues.push(uncovered(
         "unverified_rebind",
-        "\{checkpoint.name}: listener recreation remains unverified for \{names}. Confirm all listeners are recreated with rebind_all.",
+        "\{checkpoint.name}: listener recreation remains unverified for \{names}. Confirm recreation with rebind_units or rebind_all.",
         None,
       ))
       if scan.exit_code == 3 {
