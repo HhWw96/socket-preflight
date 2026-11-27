@@ -1,5 +1,5 @@
 ///|
-pub let version : String = "0.0.31"
+pub let version : String = "0.1.0"
 
 ///|
 pub let max_units : Int32 = 64

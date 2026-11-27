@@ -35,7 +35,10 @@ def main():
             [moon, "run", "--target", "js", "--frozen", "--deny-warn", "."],
             cwd=consumer, env=env, text=True, encoding="utf-8", timeout=60,
         ).strip()
-        assert output == "transition: legacy.socket and next.socket overlap on TCP 45391", output
+        assert output.splitlines() == [
+            "transition: legacy.socket and next.socket overlap on TCP 45391",
+            "candidate: selective recreation verified",
+        ], output
         print(output)
 
 

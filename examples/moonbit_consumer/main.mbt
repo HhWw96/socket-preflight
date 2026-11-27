@@ -26,4 +26,20 @@ fn main {
   }
   let conflict = overlap.new_conflicts[0]
   println("transition: \{conflict.first.unit} and \{conflict.second.unit} overlap on TCP \{conflict.port}")
+  let baseline : @preflight.StageInput = {
+    units: [legacy], environment: { ipv6: "enabled", bindv6only: "1" },
+    rebind_all: false,
+  }
+  let narrowed = selected_socket(
+    "legacy.socket", "[Socket]\nBindIPv6Only=ipv6-only\nListenStream=[::]:45391\n",
+  )
+  let candidate = { ..baseline, units: [narrowed, next], }
+  let pending = @preflight.analyze_staged_rollout(baseline, [], candidate, require_clear=true)
+  let passed = @preflight.analyze_staged_rollout_with_rebinds(
+    baseline, [], candidate, Map([("candidate", ["legacy.socket"])]), require_clear=true,
+  )
+  guard pending.exit_code == 2 && passed.exit_code == 0 && passed.complete else {
+    abort("Expected verified recreation of legacy.socket to allow the candidate")
+  }
+  println("candidate: selective recreation verified")
 }
