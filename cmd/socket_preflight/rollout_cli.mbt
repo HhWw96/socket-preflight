@@ -119,6 +119,17 @@ fn load_staged_plan(
 }
 
 ///|
+fn plan_json_within_depth(value : Json, remaining : Int) -> Bool {
+  match value {
+    Object(fields) =>
+      remaining > 0 && fields.values().all(item => plan_json_within_depth(item, remaining - 1))
+    Array(items) =>
+      remaining > 0 && items.iter().all(item => plan_json_within_depth(item, remaining - 1))
+    _ => true
+  }
+}
+
+///|
 fn read_rollout(file : String, roots : Map[String, String]) -> Result[LoadedRollout, String] {
   let location = split_plan_path(file)
   let directory = location[0]
@@ -126,13 +137,14 @@ fn read_rollout(file : String, roots : Map[String, String]) -> Result[LoadedRoll
   if content[0] != "read" {
     return Err("Cannot read rollout plan (\{content[0]}).")
   }
-  let parsed = Some(
-    @json.parse(content[1][:], max_nesting_depth=12, reject_duplicate_keys=true),
-  ) catch {
+  let parsed = Some(@json.parse(content[1][:], reject_duplicate_keys=true)) catch {
     _ => None
   }
-  guard parsed is Some(Object(fields)) else {
+  guard parsed is Some(Object(fields) as document) else {
     return Err("The rollout plan must be a UTF-8 JSON object with unique keys.")
+  }
+  if !plan_json_within_depth(document, 12) {
+    return Err("The rollout plan must contain at most 12 nested objects or arrays.")
   }
   let transition = fields.get("transition")
   let legacy_fields = if transition is Some(_) { 5 } else { 4 }

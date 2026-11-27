@@ -106,6 +106,13 @@ def check_plans(node, entry, example, checks):
     plan.write_text((example / "bad.json").read_text(encoding="utf-8").replace(
         '"schema_version": 1,', '"schema_version": 1, "schema_version": 1,'), encoding="utf-8")
     gate("duplicate_json_key", plan, 3)
+    if release_version >= (0, 1, 1):
+        deep = []
+        for _ in range(12):
+            deep = [deep]
+        plan.write_text(json.dumps({**raw, "candidate": deep}), encoding="utf-8")
+        rejected = gate("json-nesting-limit", plan, 3)
+        assert "at most 12 nested" in rejected["issues"][0]["message"]
     plan.write_text(json.dumps({key: value for key, value in raw.items() if key != "transition"}), encoding="utf-8")
     assert gate("overlap_not_declared", plan, 0).get("transition") is None
 
