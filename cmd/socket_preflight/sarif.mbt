@@ -170,3 +170,45 @@ fn emit_comparison_sarif(
   }
   emit_sarif(results, report.exit_code)
 }
+
+///|
+fn emit_rollout_sarif(
+  stages : Array[(String, @preflight.Comparison?)],
+  roots : Map[String, String],
+  issues : Array[@preflight.Issue],
+  exit_code : Int,
+  require_clear~ : Bool = false,
+) -> Unit {
+  let results : Array[Json] = []
+  let mut baseline_emitted = false
+  for item in stages {
+    let (label, stage) = item
+    if stage is Some(result) && roots.get(label) is Some(root) {
+      if !baseline_emitted && result.baseline is Some(before) &&
+        roots.get("baseline") is Some(baseline) {
+        append_sarif_issues(results, before, baseline, "baseline")
+        baseline_emitted = true
+      }
+      if result.candidate is Some(after) {
+        append_sarif_issues(results, after, root, label)
+        let conflicts = if require_clear { after.conflicts } else { result.new_conflicts }
+        for conflict in conflicts {
+          results.push(sarif_conflict(root, conflict, label + ": Conflict", "error"))
+        }
+      }
+      if !require_clear {
+        for conflict in result.uncertain_new {
+          results.push(sarif_conflict(root, conflict, label + ": Unconfirmed change", "warning"))
+        }
+      }
+      for issue in result.issues {
+        results.push(sarif_issue(root, label, issue))
+      }
+    }
+  }
+  for issue in issues {
+    // A flattened rollout issue may refer to different snapshot roots.
+    results.push(sarif_issue(".", "rollout", { ..issue, source: None, }))
+  }
+  emit_sarif(results, exit_code)
+}

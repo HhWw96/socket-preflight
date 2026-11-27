@@ -16,6 +16,7 @@ fn load_plan_stage(
   label : String,
   json : Json?,
   budget : Budget,
+  roots : Map[String, String],
   expected_fields~ : Int = 2,
 ) -> Result[Array[@preflight.UnitInput], String] {
   guard json is Some(Object(fields)) &&
@@ -40,7 +41,9 @@ fn load_plan_stage(
     units.push(unit)
   }
   units.sort()
-  match load_snapshot(resolve_stage_root(directory, root), units, budget~) {
+  let resolved = resolve_stage_root(directory, root)
+  roots[label] = resolved
+  match load_snapshot(resolved, units, budget~) {
     Ok(inputs) => Ok(inputs)
     Err(message) => Err("\{label}: \{message}")
   }
@@ -73,6 +76,7 @@ fn load_staged_plan(
   fallback : @preflight.Environment,
   budget : Budget,
   rebind_units : Map[String, Array[String]],
+  roots : Map[String, String],
   named~ : Bool = false,
 ) -> Result[@preflight.StageInput, String] {
   guard json is Some(Object(fields)) else { return Err("\{label} must be an object.") }
@@ -108,14 +112,14 @@ fn load_staged_plan(
     rebind_units[label] = units
     expected_fields += 1
   }
-  match load_plan_stage(directory, label, json, budget, expected_fields~) {
+  match load_plan_stage(directory, label, json, budget, roots, expected_fields~) {
     Ok(units) => Ok({ units, environment, rebind_all, })
     Err(message) => Err(message)
   }
 }
 
 ///|
-fn read_rollout(file : String) -> Result[LoadedRollout, String] {
+fn read_rollout(file : String, roots : Map[String, String]) -> Result[LoadedRollout, String] {
   let location = split_plan_path(file)
   let directory = location[0]
   let content = probe(open_probe(directory), location[1], "read")
@@ -159,11 +163,11 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
   let budget : Budget = { remaining: limit, }
   if checkpoints is Some(checkpoints) {
     let rebind_units : Map[String, Array[String]] = Map([])
-    let baseline = match load_staged_plan(directory, "baseline", fields.get("baseline"), environment, budget, rebind_units) {
+    let baseline = match load_staged_plan(directory, "baseline", fields.get("baseline"), environment, budget, rebind_units, roots) {
       Ok(stage) => stage
       Err(message) => return Err(message)
     }
-    let candidate = match load_staged_plan(directory, "candidate", fields.get("candidate"), environment, budget, rebind_units) {
+    let candidate = match load_staged_plan(directory, "candidate", fields.get("candidate"), environment, budget, rebind_units, roots) {
       Ok(stage) => stage
       Err(message) => return Err(message)
     }
@@ -177,7 +181,7 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
         return Err("Use distinct literal checkpoint names.")
       }
       names[name] = true
-      match load_staged_plan(directory, name, Some(stage), environment, budget, rebind_units, named=true) {
+      match load_staged_plan(directory, name, Some(stage), environment, budget, rebind_units, roots, named=true) {
         Ok(stage) => stages.push({ name, stage, })
         Err(message) => return Err(message)
       }
@@ -185,13 +189,13 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
     return Ok(Staged(baseline, stages, candidate, require_clear, rebind_units))
   }
   let baseline = match
-    load_plan_stage(directory, "baseline", fields.get("baseline"), budget) {
+    load_plan_stage(directory, "baseline", fields.get("baseline"), budget, roots) {
     Ok(stage) => stage
     Err(message) => return Err(message)
   }
   budget.remaining = limit
   let candidate = match
-    load_plan_stage(directory, "candidate", fields.get("candidate"), budget) {
+    load_plan_stage(directory, "candidate", fields.get("candidate"), budget, roots) {
     Ok(stage) => stage
     Err(message) => return Err(message)
   }
@@ -199,7 +203,7 @@ fn read_rollout(file : String) -> Result[LoadedRollout, String] {
   let transition = match transition {
     None => None
     stage =>
-      match load_plan_stage(directory, "transition", stage, budget) {
+      match load_plan_stage(directory, "transition", stage, budget, roots) {
         Ok(inputs) => Some(inputs)
         Err(message) => return Err(message)
       }
@@ -239,21 +243,23 @@ fn emit_checkpoint_rollout(report : @preflight.CheckpointRolloutReport, json : B
 ///|
 fn run_rollout(args : ArrayView[String]) -> Unit {
   let json = args.any(arg => arg == "--json")
+  let sarif = args.any(arg => arg == "--sarif")
   let options = []
   for argument in args {
-    if argument != "--json" {
+    if argument != "--json" && argument != "--sarif" {
       options.push(argument)
     }
   }
-  let required_args = if json { 3 } else { 2 }
-  let input = if args.length() == required_args &&
+  let roots : Map[String, String] = Map([])
+  let required_args = if json || sarif { 3 } else { 2 }
+  let input = if !(json && sarif) && args.length() == required_args &&
     options.length() == 2 &&
     options[0] == "--plan" &&
     !options[1].is_empty() &&
     !options[1].has_prefix("--") {
-    read_rollout(options[1])
+    read_rollout(options[1], roots)
   } else {
-    Err("Supply --plan <plan.json> and optional --json.")
+    Err("Supply --plan <plan.json> and optionally one of --json or --sarif.")
   }
   let report = match input {
     Ok(Legacy(plan)) => @preflight.analyze_rollout(plan)
@@ -261,10 +267,23 @@ fn run_rollout(args : ArrayView[String]) -> Unit {
       let result = @preflight.analyze_staged_rollout_with_rebinds(
         baseline, stages, candidate, rebind_units, require_clear~,
       )
-      emit_checkpoint_rollout(result, json)
+      if sarif {
+        let stages = result.checkpoints.map(checkpoint => (checkpoint.name, Some(checkpoint.result)))
+        stages.push(("candidate", result.candidate))
+        emit_rollout_sarif(stages, roots, result.issues, result.exit_code, require_clear~)
+      } else {
+        emit_checkpoint_rollout(result, json)
+      }
       return
     }
     Err(message) => @preflight.rollout_error(message)
+  }
+  if sarif {
+    emit_rollout_sarif(
+      [("transition", report.transition), ("candidate", report.candidate)],
+      roots, report.issues, report.exit_code,
+    )
+    return
   }
   if json {
     println(@json.to_json(report).stringify(indent=2))

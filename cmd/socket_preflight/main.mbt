@@ -26,7 +26,7 @@ let usage : String =
   #|   socket-preflight compare --baseline <snapshot-dir> --candidate <snapshot-dir>
   #|       [same environment flags] [--candidate-ipv6 <mode>] [--candidate-bindv6only <value>]
   #|       [--json|--sarif] <first.socket> [...]
-  #|   socket-preflight rollout --plan <plan.json> [--json]
+  #|   socket-preflight rollout --plan <plan.json> [--json|--sarif]
   #|   socket-preflight --version
   #| 
   #| Name each system socket unit in one planned concurrent, same-namespace group.

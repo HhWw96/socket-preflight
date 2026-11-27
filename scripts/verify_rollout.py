@@ -9,6 +9,8 @@ import platform
 import shutil
 import subprocess
 import tempfile
+from urllib.parse import urljoin, urlsplit
+from urllib.request import url2pathname
 import zipfile
 
 from verify_rollout_systemd import CASES, fixture
@@ -41,7 +43,7 @@ def check_systemd(receipt, example):
 def run_cli(node, entry, *args, code):
     result = subprocess.run([node, entry, *args], capture_output=True, encoding="utf-8", timeout=20)
     assert result.returncode == code and not result.stderr, (args, result)
-    if "--json" in args:
+    if "--json" in args and "--sarif" not in args:
         report = json.loads(result.stdout)
         assert report["exit_code"] == code
         return report
@@ -245,6 +247,52 @@ def check_plans(node, entry, example, checks):
 
     if patch >= 27:
         check_reconfigured_bindings(example, plan, gate, selective=patch >= 29)
+    if patch >= 30:
+        check_sarif(node, entry, example, checks)
+
+
+def check_sarif(node, entry, example, checks):
+    def results(label, plan, code, *flags):
+        args = ("rollout", "--plan", str(plan))
+        if not flags:
+            run_cli(node, entry, *args, "--json", code=code)
+        log = json.loads(run_cli(node, entry, *args, "--sarif", *flags, code=code))
+        assert log["version"] == "2.1.0"
+        sarif, = log["runs"]
+        assert sarif["invocations"][0]["executionSuccessful"] == (code != 3)
+        base = sarif["originalUriBaseIds"]["%SRCROOT%"]["uri"]
+        for item in sarif["results"]:
+            for key in ("locations", "relatedLocations"):
+                for result in item.get(key, []):
+                    physical = result["physicalLocation"]
+                    path = urlsplit(urljoin(base, physical["artifactLocation"]["uri"])).path
+                    source = Path(url2pathname(path))
+                    assert source.is_relative_to(example) and source.is_file(), source
+        checks[label] = {"exit_code": code, "results": len(sarif["results"])}
+        return sarif["results"]
+
+    for plan, stage in (("bad.json", "transition"), ("checkpoints.json", "coexist")):
+        found = results("sarif-" + stage, example / plan, 1)
+        diagnostic, = [item for item in found if item["ruleId"] == "TCP_BIND_OVERLAP"]
+        assert diagnostic["level"] == "error" and stage + ":" in diagnostic["message"]["text"]
+        assert "TCP 45391" in diagnostic["message"]["text"]
+        for field, name, line in (("locations", "legacy.socket", 3), ("relatedLocations", "next.socket", 2)):
+            located = diagnostic[field][0]["physicalLocation"]
+            assert located["artifactLocation"]["uri"].endswith("/overlap/usr/lib/systemd/system/" + name)
+            assert located["region"]["startLine"] == line
+
+    assert results("sarif-clear", example / "fixed.json", 0) == []
+    assert results("sarif-bad-plan", example / "absent.json", 3)[0]["ruleId"] == "INVALID_INPUT"
+    assert results("sarif-exclusive-format", example / "bad.json", 3, "--json")[0]["ruleId"] == "INVALID_INPUT"
+    raw = json.loads((example / "checkpoints.json").read_text(encoding="utf-8"))
+    plan = example / "sarif-test.json"
+    plan.write_text(json.dumps({**raw, "environment": {"ipv6": "unknown", "bindv6only": "unknown"}}),
+                    encoding="utf-8")
+    assert any(item["level"] == "warning" for item in results("sarif-coverage", plan, 2))
+    stage = {key: val for key, val in raw["checkpoints"][-1].items() if key != "name"}
+    plan.write_text(json.dumps({**raw, "policy": "require-clear",
+                                "baseline": stage, "candidate": stage, "checkpoints": []}), encoding="utf-8")
+    assert results("sarif-strict-existing-conflict", plan, 1)[0]["level"] == "error"
 
 
 def check_reconfigured_bindings(example, plan, gate, selective):
