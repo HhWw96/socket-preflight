@@ -1,6 +1,6 @@
 name = "HhWw96/socket-preflight"
 
-version = "0.0.30"
+version = "0.0.31"
 
 readme = "README.md"
 

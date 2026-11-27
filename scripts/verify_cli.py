@@ -2,6 +2,7 @@
 """Exercise the extracted release, including path, provenance and exit-code rules."""
 
 import argparse
+from release_version import package_version
 from collections import Counter
 from dataclasses import asdict
 import hashlib
@@ -75,7 +76,7 @@ def main():
         version_proc = cli(["--version"])
         version = version_proc.stdout.strip()
         assert version_proc.returncode == 0 and version == f"SocketPreflight {entry.stem.removeprefix('socket-preflight-')}"
-        patch = int(version.rsplit(".", 1)[-1])
+        release_version = package_version(entry)
         samples = workspace / "examples"
         conflicted = scan("shipped-bad-snapshot", samples / "conflict", 1, "--ipv6", "enabled", conflicts=1)
         item = conflicted["conflicts"][0]
@@ -90,7 +91,7 @@ def main():
                               units=("public.socket", "admin.socket"), conflicts=1)
         assert reversed_units == conflicted
 
-        if patch >= 19:
+        if release_version >= (0, 0, 19):
             encoded = workspace / "review space #"
             shutil.copytree(samples / "conflict", encoded)
             proc = cli(["compare", "--baseline", "examples/fixed", "--candidate", encoded.name,
@@ -172,7 +173,7 @@ def main():
         assert fragments["units"][1]["plan"]["fragment"] == ADMIN + "public.socket"
         assert len(fragments["units"][1]["plan"]["shadowed"]) == 2
 
-        if patch >= 15:
+        if release_version >= (0, 0, 15):
             local = "usr/local/lib/systemd/system/"
             tree = snapshot("local-socket-inventory")
             put(tree, local + "public.socket", "[Socket]\nListenStream=127.0.0.1:45392\n")
@@ -257,7 +258,7 @@ def main():
 
         extended = {}
         for case in cases():
-            if patch < 3 and case.suite == "mapped":
+            if release_version < (0, 0, 3) and case.suite == "mapped":
                 continue
             root = workspace / case.name
             for path, value in case.files.items():
@@ -299,7 +300,7 @@ def main():
                                 "attempts": sum(len(row["attempts"]) for row in rows[1:]),
                                 "report_sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
 
-        if patch >= 3:
+        if release_version >= (0, 0, 3):
             generic = snapshot("mapped-kernel-default", second=listener("[::ffff:127.0.0.1]", "default"))
             scan("mapped-default-unknown", generic, 2, "--ipv6", "enabled", issue="unknown_bindv6only")
             scan("mapped-default-is-dual", generic, 1, "--ipv6", "enabled", "--bindv6only", "0", conflicts=1)
@@ -347,7 +348,7 @@ def main():
             results.append({"case": "links-are-not-followed", "status": "skipped", "reason": type(error).__name__})
         else:
             scan("links-are-not-followed", generic, 2, issue="symlink")
-            if patch >= 5:
+            if release_version >= (0, 0, 5):
                 linked_root = snapshot("linked-shared-directory")
                 outside_dir = workspace / "unexported-drop-ins"
                 put(outside_dir, "10-site.conf", b"\xff")
@@ -357,7 +358,7 @@ def main():
                 report = scan("shared-directory-link-is-never-followed", linked_root, 2, issue="symlink")
                 assert all(unit["issues"][0]["code"] == "symlink" for unit in report["units"])
 
-        if patch >= 5:
+        if release_version >= (0, 0, 5):
             generic = snapshot("case-sensitive-linux-snapshot")
             put(generic, ADMIN + "Public.socket", b"\xff")
             put(generic, "run/Systemd/system/socket.d/10-wrong-case.conf", b"\xff")
@@ -368,7 +369,7 @@ def main():
         assert proc.returncode == 1 and "20-site.conf:2" in proc.stdout and "public.socket:5" in proc.stdout
         results.append({"case": "human-readable-two-sided-location", "status": "conflict", "exit_code": 1})
 
-        if patch >= 4:
+        if release_version >= (0, 0, 4):
             def compare(label, baseline, candidate, code, *, units=("admin.socket", "public.socket"),
                         counts=(0, 0, 0, 0, 0), complete=True):
                 proc = cli(["compare", "--baseline", str(baseline), "--candidate", str(candidate),
@@ -401,7 +402,7 @@ def main():
             assert result["candidate"]["conflict_count"] == 1
             assert result["existing_conflicts"][0]["first"]["setting"]["source"]["line"] == 3
 
-            if patch >= 14:
+            if release_version >= (0, 0, 14):
                 wildcard = "ListenStream=0.0.0.0:45391\n"
                 ordered = snapshot("intra-unit-wildcard", first=PAYLOAD + wildcard)
                 reversed_order = snapshot("intra-unit-reordered",
@@ -438,7 +439,7 @@ def main():
                              units=dense_units, counts=(0, 256, 0, 0, 0), complete=False)
             assert result["baseline"]["conflicts_omitted"] == 20
 
-            if patch >= 20:
+            if release_version >= (0, 0, 20):
                 def compare_target(before, after, expected, *overrides):
                     proc = cli(["compare", "--baseline", str(v6), "--candidate", str(v6),
                                 "--ipv6", "enabled", "--bindv6only", before, "--json",

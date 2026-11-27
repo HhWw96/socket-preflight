@@ -2,6 +2,7 @@
 """Compare a checked release to a real systemd manager in a disposable lab."""
 
 import argparse
+from release_version import package_version
 from datetime import datetime, timezone
 from io import BytesIO
 import json
@@ -247,8 +248,8 @@ def verify_release(release, digest, out):
         binary = release.with_suffix(".cjs").name
         cli = work / binary
         cli.write_bytes(package.read(binary))
-        patch = int(release.stem.rsplit(".", 1)[-1])
-        staged_environments = patch >= 24
+        release_version = package_version(release)
+        staged_environments = release_version >= (0, 0, 24)
         rows = []
         for case, stage, folder, endpoints in STAGES:
             if stage != "transition":
@@ -300,8 +301,8 @@ def verify_release(release, digest, out):
                 report = json.loads(proc.stdout)
                 assert proc.returncode == report["exit_code"] == expected, report
                 emit({"stage_environment_check": label, "report": report})
-        if patch >= 27:
-            emit(verify_binding_reconfiguration(cli, work, selective=patch >= 29))
+        if release_version >= (0, 0, 27):
+            emit(verify_binding_reconfiguration(cli, work, selective=release_version >= (0, 0, 29)))
     count = sum(len(row["attempts"]) for row in rows)
     passed = count == 30 and all(row["pass"] for row in rows)
     emit({"scenarios": len(rows), "attempts": count, "pass": passed})

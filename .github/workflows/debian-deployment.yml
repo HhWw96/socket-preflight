@@ -43,7 +43,7 @@ jobs:
           tag = os.environ["RELEASE_TAG"]
           expected_hash = os.environ["RELEASE_SHA256"].lower()
           case = os.environ["SELECTED_CASE"]
-          if (not re.fullmatch(r"v0\.0\.\d+", tag) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash)
+          if (not re.fullmatch(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", tag) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash)
                   or case not in {"bad", "fixed", "inconclusive", "bad-checksum", "substituted"}):
               raise SystemExit("Invalid release tag, checksum or case")
           stem = f"socket-preflight-{tag}"

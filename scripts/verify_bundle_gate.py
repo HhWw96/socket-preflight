@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+from release_version import package_version
 from pathlib import Path
 import platform
 import stat
@@ -161,7 +162,7 @@ def verify(release, inputs):
             if pack.name in archive.namelist():
                 pack.write_bytes(archive.read(pack.name))
             summary = tool / "summarize_receipt.py"
-            if int(entry.rsplit(".", 2)[-2]) >= 26:
+            if package_version(entry) >= (0, 0, 26):
                 summary.write_bytes(archive.read(summary.name))
         cli_hash = sha(cli)
 
@@ -180,7 +181,7 @@ def verify(release, inputs):
 
         bad = inputs / "debian-bad.zip"
         fixed = inputs / "debian-fixed.zip"
-        if int(entry.rsplit(".", 2)[-2]) >= 28:
+        if package_version(entry) >= (0, 0, 28):
             verify_plan_packaging(pack, root, inputs, run, checks)
         result = run("bad", bad, 1)
         finding, = result["rollout"]["transition"]["new_conflicts"]
@@ -237,13 +238,13 @@ def verify(release, inputs):
                         archive.writestr(entry, content)
             return run(name, target, expected)
 
-        if int(entry.rsplit(".", 2)[-2]) >= 17:
+        if package_version(entry) >= (0, 0, 17):
             multistage = {key: value for key, value in plan.items() if key != "transition"}
             multistage["schema_version"] = 2
             multistage["checkpoints"] = [{"name": "during", **plan["transition"]}]
             result = variant("named-checkpoint-deployment-bundle", updated_plan=multistage, expected=1)
             assert result["rollout"]["checkpoints"][0]["result"]["new_conflicts"][0]["port"] == 9090
-            if int(entry.rsplit(".", 2)[-2]) >= 18:
+            if package_version(entry) >= (0, 0, 18):
                 carried = {**multistage, "baseline": plan["transition"]}
                 variant("default-policy-allows-existing-conflict", updated_plan=carried, expected=0)
                 strict = variant("strict-policy-blocks-existing-conflict",
@@ -255,7 +256,7 @@ def verify(release, inputs):
             rejected = variant("checkpoint-root-stays-inside-bundle", updated_plan=multistage)
             assert rejected["rollout"] is None
 
-        if int(entry.rsplit(".", 2)[-2]) >= 24:
+        if package_version(entry) >= (0, 0, 24):
             units = ["v4.socket", "v6.socket"]
             stage = {"root": "target", "units": units}
             scope = {"schema_version": 2, "checkpoints": [],
@@ -271,7 +272,7 @@ def verify(release, inputs):
             scope["candidate"]["rebind_all"] = True
             conflict = variant("stage-rebind-confirmed-detects-conflict", snapshots, scope, expected=1)
             assert conflict["rollout"]["candidate"]["new_conflicts"][0]["port"] == 45397
-            if int(entry.rsplit(".", 2)[-2]) >= 25:
+            if package_version(entry) >= (0, 0, 25):
                 staged = {key: value for key, value in plan.items() if key != "transition"}
                 staged.update(schema_version=2, checkpoints=[{"name": "overlap", **plan["transition"]}],
                               candidate={**plan["candidate"], "environment": {
@@ -299,7 +300,7 @@ def verify(release, inputs):
         corrupt = root / "corrupt.zip"
         corrupt.write_bytes(b"invalid archive")
         run("corrupt", corrupt, 3)
-        if int(entry.rsplit(".", 2)[-2]) >= 12:
+        if package_version(entry) >= (0, 0, 12):
             broken = root / "broken-member.zip"
             with zipfile.ZipFile(broken, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr("plan.json", entries["plan.json"])

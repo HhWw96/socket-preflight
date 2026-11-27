@@ -46,7 +46,7 @@ jobs:
 
           tag = os.environ["TOOL_TAG"]
           digest = os.environ["TOOL_SHA256"].lower()
-          if not re.fullmatch(r"v0\.0\.\d+", tag) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+          if not re.fullmatch(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", tag) or not re.fullmatch(r"[0-9a-f]{64}", digest):
               raise SystemExit("Invalid release tag or SHA-256")
           if not Path("incoming/deployment.zip").is_file():
               raise SystemExit("The input artifact must contain deployment.zip at its root")

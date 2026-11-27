@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+from release_version import package_version
 from pathlib import Path
 import platform
 import shutil
@@ -51,7 +52,7 @@ def run_cli(node, entry, *args, code):
 
 
 def check_plans(node, entry, example, checks):
-    patch = int(entry.stem.rsplit(".", 1)[-1])
+    release_version = package_version(entry)
 
     def gate(label, plan, code, schema=1, status=None):
         report = run_cli(node, entry, "rollout", "--plan", str(plan), "--json", code=code)
@@ -128,7 +129,7 @@ def check_plans(node, entry, example, checks):
         staged_plan = json.loads(checkpoints.read_text(encoding="utf-8"))
         stages = staged_plan["checkpoints"]
         stages[1]["root"] = "fixed"
-        if patch >= 27:
+        if release_version >= (0, 0, 27):
             staged_plan["candidate"]["rebind_all"] = True
         plan.write_text(json.dumps(staged_plan), encoding="utf-8")
         gate("fixed-checkpoints-pass", plan, 0, schema=2)
@@ -139,7 +140,7 @@ def check_plans(node, entry, example, checks):
         plan.write_text(json.dumps(staged_plan), encoding="utf-8")
         gate("reserved-checkpoint-name", plan, 3)
 
-        if int(entry.stem.rsplit(".", 1)[-1]) >= 18:
+        if release_version >= (0, 0, 18):
             old = dict(raw["transition"])
             phase = {"name": "coexist", **old}
             policy_plan = {**staged_plan, "baseline": old, "checkpoints": [phase]}
@@ -151,7 +152,7 @@ def check_plans(node, entry, example, checks):
             stage = blocked["checkpoints"][0]["result"]
             assert len(stage["existing_conflicts"]) == 1 and not stage["new_conflicts"]
             policy_plan["checkpoints"] = [{**phase, "root": "fixed"}]
-            if patch >= 27:
+            if release_version >= (0, 0, 27):
                 policy_plan["checkpoints"][0]["rebind_all"] = True
             plan.write_text(json.dumps(policy_plan), encoding="utf-8")
             gate("strict-policy-allows-a-resolved-baseline-conflict", plan, 0, schema=2)
@@ -159,7 +160,7 @@ def check_plans(node, entry, example, checks):
             plan.write_text(json.dumps(policy_plan), encoding="utf-8")
             gate("strict-policy-spelling-is-validated", plan, 3)
 
-    if patch >= 24:
+    if release_version >= (0, 0, 24):
         stage_dir = example / "target-env/usr/lib/systemd/system"
         stage_dir.mkdir(parents=True)
         for name, endpoint in (("v6.socket", "[::]:45397"), ("v4.socket", "127.0.0.1:45397")):
@@ -185,9 +186,9 @@ def check_plans(node, entry, example, checks):
         plan.write_text(json.dumps({"schema_version": 2, "environment": a, "baseline": shared,
             "checkpoints": [{**shared, "name":"flip", "environment":b, "rebind_all":True}],
             "candidate": shared}), encoding="utf-8")
-        check = gate("return-to-default-needs-rebind-too", plan, 1 if patch >= 25 else 2, schema=2)
+        check = gate("return-to-default-needs-rebind-too", plan, 1 if release_version >= (0, 0, 25) else 2, schema=2)
         assert "candidate" in check["issues"][0]["message"]
-        if patch >= 25:
+        if release_version >= (0, 0, 25):
             assert check["checkpoints"][0]["result"]["new_conflicts"][0]["port"] == 45397
         plan.write_text(json.dumps({"schema_version": 2, "environment": a, "baseline": shared,
             "policy": "require-clear",
@@ -196,7 +197,7 @@ def check_plans(node, entry, example, checks):
         check = gate("strict-stage-environment-change-is-blocked", plan, 1, schema=2, status="conflict")
         assert check["checkpoints"][0]["result"]["new_conflicts"]
 
-    if patch >= 25:
+    if release_version >= (0, 0, 25):
         staged = json.loads((example / "checkpoints.json").read_text(encoding="utf-8"))
         changed = {**staged["candidate"], "environment": b}
 
@@ -245,9 +246,9 @@ def check_plans(node, entry, example, checks):
         assert [stage["name"] for stage in result["checkpoints"]] == ["removed"]
         assert result["candidate"]["complete"] and len(result["issues"]) == 1
 
-    if patch >= 27:
-        check_reconfigured_bindings(example, plan, gate, selective=patch >= 29)
-    if patch >= 30:
+    if release_version >= (0, 0, 27):
+        check_reconfigured_bindings(example, plan, gate, selective=release_version >= (0, 0, 29))
+    if release_version >= (0, 0, 30):
         check_sarif(node, entry, example, checks)
 
 
@@ -398,7 +399,7 @@ def verify(archive, receipt):
                     lines = (example / stage / source["path"]).read_text(encoding="utf-8").splitlines()
                     assert lines[source["line"] - 1] == f"ListenStream={listener['endpoint']}"
         systemd = check_systemd(receipt, example) if receipt else None
-        if int(version.rsplit(".", 1)[-1]) >= 7:
+        if package_version(entry) >= (0, 0, 7):
             check_plans(node, entry, example, checks)
     return {"version": version, "archive_sha256": sha(archive), "host": platform.platform(),
             "node": subprocess.check_output([node, "--version"], text=True).strip(),

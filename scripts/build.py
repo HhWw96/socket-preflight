@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import zipfile
 
+from release_version import VERSION_PATTERN
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTS = ("README.md", "CHANGELOG.md", "LICENSE", "LICENSE-APACHE-2.0", "NOTICE-MOONBIT-CORE", "THIRD_PARTY.md")
@@ -36,9 +38,9 @@ def sha256(path):
 
 def module_version():
     manifest = (ROOT / "moon.mod").read_text(encoding="utf-8")
-    match = re.search(r'^version = "(0\.0\.\d+)"$', manifest, re.MULTILINE)
+    match = re.search(rf'^version = "({VERSION_PATTERN})"$', manifest, re.MULTILINE)
     if not match:
-        raise SystemExit("Expected a 0.0.X version in moon.mod.")
+        raise SystemExit("Expected a stable major.minor.patch version in moon.mod.")
     return match[1]
 
 
@@ -100,7 +102,7 @@ def main():
     temporary_archive.replace(archive)
     sums = dist / "SHA256SUMS"
     retained = sorted(path for path in dist.iterdir()
-                      if re.fullmatch(r"socket-preflight-v0\.0\.\d+\.(?:cjs|zip)", path.name))
+                      if re.fullmatch(rf"socket-preflight-v{VERSION_PATTERN}\.(?:cjs|zip)", path.name))
     temporary_sums = sums.with_suffix(".tmp")
     temporary_sums.write_text("".join(f"{sha256(p)}  {p.name}\n" for p in retained), encoding="ascii")
     temporary_sums.replace(sums)

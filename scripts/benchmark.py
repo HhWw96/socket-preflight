@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+from release_version import stable_version
 from pathlib import Path
 import platform
 import shutil
@@ -107,7 +108,7 @@ def main():
         raise SystemExit("Node.js 24 is required.")
     entries = (args.baseline.resolve(strict=True), args.candidate.resolve(strict=True))
     versions = tuple(metadata(node, entry) for entry in entries)
-    semantics = tuple(int(info["version"].rsplit(".", 1)[-1]) >= 14 for info in versions)
+    semantics = tuple(stable_version(info["version"].removeprefix("SocketPreflight v")) >= (0, 0, 14) for info in versions)
     if semantics[0] != semantics[1]:
         parser.error("Use two releases with the same single-unit conflict semantics (both before v0.0.14 or both since it).")
     rows = {}
